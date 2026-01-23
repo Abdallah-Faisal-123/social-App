@@ -13,45 +13,45 @@ import { AuthContext } from '../Authcontext/Authcontext'
 
 
 export default function Signupform() {
- const {token,setToken} = useContext(AuthContext)
+  const { token, setToken } = useContext(AuthContext)
   console.log(token)
   const navigate = useNavigate();
-  
-  const [wrongCredentials,setwrongCredentials] = useState(null);
+
+  const [wrongCredentials, setwrongCredentials] = useState(null);
 
   const passwordRegex = /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$ %^&*-]).{8,}$/
 
   async function handeleSubmit(values) {
     try {
-       
-      const options={
-        url:"https://linked-posts.routemisr.com/users/signin",
-        method:"POST",
-        data:values
+
+      const options = {
+        url: "https://linked-posts.routemisr.com/users/signin",
+        method: "POST",
+        data: values
 
       }
-      
-      const {data} = await axios.request(options);
+
+      const { data } = await axios.request(options);
       if (data.message === 'success') {
         toast.success("Welcome Back")
         setToken(data.token)
-        localStorage.setItem('token',data.token)        
+        localStorage.setItem('token', data.token)
         setTimeout(() => {
           navigate('/')
         }, 5000)
-      } 
+      }
     } catch (error) {
-       setwrongCredentials(error.response.data.error)
-       
+      setwrongCredentials(error.response.data.error)
+
     }
-  
+
   }
 
 
   const signUpSchema = yup.object({
     email: yup.string().email('Invalid email address').required('Email is required'),
     password: yup.string().required('Password is required').matches(passwordRegex, 'your pasword must be at leatest  Minimum eight characters, at least one upper case English letter, one lower case English letter, one number and one special character'),
-  
+
   })
 
 
@@ -121,12 +121,12 @@ export default function Signupform() {
               onChange={formik.handleChange}
               onBlur={formik.handleBlur}
             />
-           
-              
-      {wrongCredentials && (<div className="text-sm text-red-500 pt-2">*{wrongCredentials}</div> )}
+
+
+            {wrongCredentials && (<div className="text-sm text-red-500 pt-2">*{wrongCredentials}</div>)}
 
             <div className="w-full py-3 text-white">
-              <button type='submit' disabled={!(formik.isValid && formik.dirty)|| formik.isSubmitting} className='w-full disabled:cursor-not-allowed disabled:bg-linear-to-r disabled:from-gray-600 disabled:to-black  bg-linear-to-r from-blue-600 to-cyan-400 shadow rounded-xl p-2'> {formik.isSubmitting ? "Loading..." : "Login"} {!formik.isSubmitting && <FontAwesomeIcon icon={faArrowRightLong} />} </button>
+              <button type='submit' disabled={!(formik.isValid && formik.dirty) || formik.isSubmitting} className='w-full disabled:cursor-not-allowed disabled:bg-linear-to-r disabled:from-gray-600 disabled:to-black  bg-linear-to-r from-blue-600 to-cyan-400 shadow rounded-xl p-2'> {formik.isSubmitting ? "Loading..." : "Login"} {!formik.isSubmitting && <FontAwesomeIcon icon={faArrowRightLong} />} </button>
             </div>
           </form>
 

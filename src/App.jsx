@@ -11,6 +11,7 @@ import { Bounce, ToastContainer } from "react-toastify";
 import AuthProvider from "./component/Authcontext/Authcontext";
 import ProtectedRoute from "./component/ProtectedRoute/ProtectedRoute";
 import AuthProtector from "./component/AuthProtector/AuthProtector";
+import Chat from "./pages/Chat/chat";
 
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
         { path: "login", element: <AuthProtector><Login /></AuthProtector> },
         { path: "profile", element: <ProtectedRoute><Profile /></ProtectedRoute> },
         { path: "/postdetails/:id", element: <ProtectedRoute><Postdetails /></ProtectedRoute> },
+        { path: "/chat", element: <ProtectedRoute><Chat /></ProtectedRoute> },
         { path: "settings", element: <ProtectedRoute><Settings/></ProtectedRoute> },
         { path: "*", element: <Notfound /> },
       ],

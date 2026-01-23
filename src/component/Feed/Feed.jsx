@@ -26,6 +26,7 @@ export default function Feed() {
       }
       const lastPost = await axios.request(options)
       console.log(lastPost)
+      lastPost.data.posts.forEach(post => console.log(post.user._id))
       setPosts(lastPost.data.posts)
 
       /* const options = {

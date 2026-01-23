@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react'
+import { jwtDecode } from 'jwt-decode'
 import Navbar from '../../component/Navbar/Navbar'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faCamera, faUser, faSpinner } from '@fortawesome/free-solid-svg-icons'
@@ -56,6 +57,7 @@ export default function Profile() {
       console.error("Error fetching profile data:", error)
 
       try {
+        const decoded = jwtDecode(token);
         setUserData({
           name: decoded.name || "User",
           photo: "https://i.pravatar.cc/300?img=12"
