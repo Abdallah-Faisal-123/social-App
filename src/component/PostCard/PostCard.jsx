@@ -2,7 +2,8 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { faCommentDots, faHeart, faThumbsUp } from "@fortawesome/free-regular-svg-icons"
 import { faA, faShareNodes, faThumbsUp as Likes } from "@fortawesome/free-solid-svg-icons"
 import Commentcard from "../Commentcard/Commentcard"
-import { Link } from "react-router"
+import { Link, Navigate } from "react-router"
+import Addcomment from "../Addcomment/Addcomment"
 
 export default function PostCard({ postInfo, commentsLimit = 3 }) {
 
@@ -37,7 +38,7 @@ export default function PostCard({ postInfo, commentsLimit = 3 }) {
         </div>
         <div className="py-3 md:py-4 flex justify-around text-sm md:text-base">
           <span className="cursor-pointer hover:text-blue-600 transition"><FontAwesomeIcon icon={faThumbsUp} className="text-lg md:text-xl mr-1" />Like</span>
-          <span className="cursor-pointer hover:text-blue-600 transition"><FontAwesomeIcon icon={faCommentDots} className="text-lg md:text-xl mr-1" />Comment</span>
+          <Link to ={`postdetails/${postInfo._id}`} className="cursor-pointer hover:text-blue-600 transition"><FontAwesomeIcon icon={faCommentDots} className="text-lg md:text-xl mr-1" />Comment</Link>
           <span className="cursor-pointer hover:text-blue-600 transition"><FontAwesomeIcon icon={faShareNodes} className="text-lg md:text-xl mr-1" />Share</span>
         </div>
         <div className="space-y-3 md:space-y-4 px-4 md:px-11 pt-3 md:pt-5">

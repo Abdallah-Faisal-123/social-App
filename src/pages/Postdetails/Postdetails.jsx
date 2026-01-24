@@ -5,6 +5,7 @@ import PostCard from '../../component/PostCard/PostCard'
 import Loading from '../../component/Loading/Loading'
 import axios from 'axios'
 import Navbar from '../../component/Navbar/Navbar'
+import Addcomment from '../../component/Addcomment/Addcomment'
 
 export default function Postdetails() {
   const [post, setPost] = useState(null)
@@ -38,7 +39,9 @@ export default function Postdetails() {
         <section className='py-8 sm:py-12 md:py-16 lg:py-20 h-full px-2 sm:px-4'>
           <div className="container mx-auto max-w-full sm:max-w-2xl">
             {post ? <PostCard postInfo={post} commentsLimit={post.comments.length} /> : <Loading cards={"details"} />}
-          </div>
+          <Addcomment id = {id}/>
+            
+          </div> 
         </section>
       </div>
     </>

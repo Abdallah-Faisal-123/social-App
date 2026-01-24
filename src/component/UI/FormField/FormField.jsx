@@ -8,7 +8,7 @@ export default function FormField({elementType,className,lableText,type,id,name,
       case 'input':
         return <>
         <input  type={type} id={id} 
-         className="bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand block w-full px-2.5 py-2 shadow-xs placeholder:text-body" 
+        className="bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand block w-full px-2.5 py-2 shadow-xs placeholder:text-body" 
          placeholder={placeholder}
           required
           name={name}
