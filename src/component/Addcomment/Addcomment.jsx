@@ -21,27 +21,29 @@ export default function Addcomment({ id }) {
   async function handleSubmit(values, { resetForm }) {
     try {
       const { data } = await axios.post(
-        "https://linked-posts.routemisr.com/comments",
+        `https://route-posts.routemisr.com/posts/${id}/comments`,
         {
           content: values.content,
-          post: id,
+          
         },
-        {
-          headers: {
-            token
-          },
+        { headers:{
+          Authorization: `Bearer ${token}`
+        } 
         }
       )
 
-      if (data.message === "success") {
+      if (data.success === true) {
         toast.success("Comment created successfully")
         resetForm()
-        window.location.reload()
+        setTimeout(() => {
+          window.location.reload()
+        }, 3000);
       } else {
         toast.error("your Comment did not created")
       }
     } catch (error) {
       console.error(error)
+      
     }
   }
 

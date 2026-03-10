@@ -21,7 +21,7 @@ export default function Signupform() {
     try {
        
       const options={
-        url:"https://linked-posts.routemisr.com/users/signup",
+        url:"https://route-posts.routemisr.com/users/signup",
         method:"POST",
         data:values
 
@@ -29,7 +29,7 @@ export default function Signupform() {
       
       const {data} = await axios.request(options);
 
-      if (data.message === 'success') {
+      if (data.success === true) {
         toast.success("your account has been created")
         setTimeout(() => {
           navigate('/login')

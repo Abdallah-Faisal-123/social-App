@@ -43,22 +43,25 @@ export default function UploadPoast() {
         formData.append('image', values.image)
       }
       const options = {
-        url: "https://linked-posts.routemisr.com/posts",
+        url: "https://route-posts.routemisr.com/posts",
         method: "POST",
         headers: {
-          token
+          Authorization: `Bearer ${token}`
         },
         data: formData
       };
 
       const { data } = await axios.request(options);
 
-      if (data.message === 'success') {
+      if (data.success === true) {
 
         toast.success("Post created successfully")
         formik.resetForm()
         setPreview(null)
-        window.location.reload()
+        
+        setTimeout(()=>{
+          window.location.reload()
+        },5000)
       }
 
     } catch (error) {
@@ -78,17 +81,19 @@ export default function UploadPoast() {
   async function getProfileData() {
     try {
       const options = {
-        url: `https://linked-posts.routemisr.com/users/profile-data`,
+        url: `https://route-posts.routemisr.com/users/profile-data`,
         method: 'GET',
-        headers: { token }
+          headers:{
+          Authorization: `Bearer ${token}`
+        }
       }
 
       const { data } = await axios.request(options)
       console.log("Profile Data API Response:", data)
 
-      if (data.user) {
-        setUserPhoto(data.user.photo)
-        console.log(data.user.photo)
+      if (data.data.user) {
+        setUserPhoto(data.data.user.photo)
+        
 
       }
       else {

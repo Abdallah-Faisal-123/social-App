@@ -7,7 +7,7 @@ export const sendMessage = async (otherUserId, text, senderId = null) => {
 
   // منع الإرسال لو البيانات ناقصة
   if (!currentUser || !currentUser.id) {
-    console.error("Current user is invalid", currentUser);
+    
     return;
   }
   if (!otherUserId) {

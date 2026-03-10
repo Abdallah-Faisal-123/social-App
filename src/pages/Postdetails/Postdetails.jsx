@@ -15,15 +15,18 @@ export default function Postdetails() {
     try {
 
       const options = {
-        url: `https://linked-posts.routemisr.com/posts/${id}`,
+        url: `https://route-posts.routemisr.com/posts/${id}`,
         method: 'GET',
-        headers: { token }
+        headers: {
+          Authorization:`Bearer ${token}`
+         }
       }
 
       const { data } = await axios.request(options)
       console.log(data)
-      if (data.message === 'success') {
-        setPost(data.post)
+      if (data.success === true) {
+        setPost(data.data.post)
+        
       }
     } catch (error) {
       console.log(error)
@@ -38,7 +41,7 @@ export default function Postdetails() {
       <div className='min-h-screen bg-gray-100'>
         <section className='py-8 sm:py-12 md:py-16 lg:py-20 h-full px-2 sm:px-4'>
           <div className="container mx-auto max-w-full sm:max-w-2xl">
-            {post ? <PostCard postInfo={post} commentsLimit={post.comments.length} /> : <Loading cards={"details"} />}
+            {post ? <PostCard postInfo={post} commentsLimit={post.commentsCount} /> : <Loading cards={"details"} />}
           <Addcomment id = {id}/>
             
           </div> 

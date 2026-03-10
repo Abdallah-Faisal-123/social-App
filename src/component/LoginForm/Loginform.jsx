@@ -12,9 +12,9 @@ import { AuthContext } from '../Authcontext/Authcontext'
 
 
 
-export default function Signupform() {
+export default function Signinform() {
   const { token, setToken } = useContext(AuthContext)
-  console.log(token)
+  
   const navigate = useNavigate();
 
   const [wrongCredentials, setwrongCredentials] = useState(null);
@@ -24,27 +24,30 @@ export default function Signupform() {
   async function handeleSubmit(values) {
     try {
 
-      const options = {
-        url: "https://linked-posts.routemisr.com/users/signin",
+      /* const options = {
+        url: "https://route-posts.routemisr.com/users/signin",
         method: "POST",
         data: values
 
-      }
-
-      const { data } = await axios.request(options);
-      if (data.message === 'success') {
+      } */
+        const { data } = await axios.post(
+          "https://route-posts.routemisr.com/users/signin",
+          values
+        )
+      if (data.success === true) {
         toast.success("Welcome Back")
-        setToken(data.token)
-        localStorage.setItem('token', data.token)
+        setToken(data.data.token)
+        localStorage.setItem('token', data.data.token)
         setTimeout(() => {
           navigate('/')
-        }, 5000)
-      }
+        }, 5000)}
     } catch (error) {
-      setwrongCredentials(error.response.data.error)
-
+      console.log(error.response.data)  
+      setwrongCredentials(
+    error.response?.data?.error || error.response?.data?.message
+  )
+      
     }
-
   }
 
 

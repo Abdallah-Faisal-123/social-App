@@ -11,23 +11,20 @@ export default function Feed() {
 
   async function gitAllPosts() {
     try {
-      const { data } = await axios.get(
-        "https://linked-posts.routemisr.com/posts?limit=50",
-        {
-          headers: { token }
-        }
-
-      )
-      const totalPages = data.paginationInfo.numberOfPages
+      
+      
+      
       const options = {
-        url: `https://linked-posts.routemisr.com/posts?limit=50&page=${totalPages}`,
+        url: `https://route-posts.routemisr.com/posts`,
         method: 'GET',
-        headers: { token }
+        headers:{
+          Authorization: `Bearer ${token}`
+        }
       }
-      const lastPost = await axios.request(options)
-      console.log(lastPost)
-      lastPost.data.posts.forEach(post => console.log(post.user._id))
-      setPosts(lastPost.data.posts)
+      const{data} = await axios.request(options)
+      
+      
+      setPosts(data.data.posts)
 
       /* const options = {
          url: `https://linked-posts.routemisr.com/posts?limit=50&page=83`,
@@ -41,6 +38,7 @@ export default function Feed() {
         */
     } catch (error) {
       console.log(error)
+      
     }
   }
   useEffect(() => {
@@ -53,7 +51,7 @@ export default function Feed() {
 
       {posts ? <div className="py-3 md:py-5"> <div className="w-full sm:max-w-xl sm:mx-auto bg-gray-200 rounded px-0 sm:px-2">
         {
-          [...posts].reverse().map((post) => <PostCard key={post._id} postInfo={post} />)
+          [...posts].map((post) => <PostCard key={post._id} postInfo={post} />)
         }
       </div>  </div> : <Loading cards={"Posts"} />}
 

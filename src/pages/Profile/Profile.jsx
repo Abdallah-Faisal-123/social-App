@@ -18,16 +18,19 @@ export default function Profile() {
   const [isUploading, setIsUploading] = useState(false)
 
   async function getUserPosts(userId) {
+    
     try {
       const options = {
-        url: `https://linked-posts.routemisr.com/users/${userId}/posts`,
+        url: `https://route-posts.routemisr.com/users/${userId}/posts`,
         method: 'GET',
-        headers: { token }
+         headers:{
+          Authorization: `Bearer ${token}`
+        }
       }
 
       const { data } = await axios.request(options)
       console.log("User Posts API Response:", data)
-      setUserPosts(data.posts || [])
+      setUserPosts(data.data.posts || [])
       setLoading(false)
     } catch (error) {
       console.error("Error fetching user posts:", error)
@@ -38,18 +41,20 @@ export default function Profile() {
   async function getProfileData() {
     try {
       const options = {
-        url: `https://linked-posts.routemisr.com/users/profile-data`,
+        url: `https://route-posts.routemisr.com/users/profile-data`,
         method: 'GET',
-        headers: { token }
+         headers:{
+          Authorization: `Bearer ${token}`
+        }
       }
 
       const { data } = await axios.request(options)
       console.log("Profile Data API Response:", data)
 
-      if (data.user) {
-        setUserData(data.user)
+      if (data.data.user) {
+        setUserData(data.data.user)
 
-        getUserPosts(data.user._id)
+        getUserPosts(data.data.user._id)
       } else {
         setLoading(false)
       }
@@ -99,9 +104,11 @@ export default function Profile() {
       formData.append('photo', file)
 
       const options = {
-        url: `https://linked-posts.routemisr.com/users/upload-photo`,
+        url: `https://route-posts.routemisr.com/users/upload-photo`,
         method: 'PUT',
-        headers: { token },
+         headers:{
+          Authorization: `Bearer ${token}`
+        },
         data: formData
       }
 
@@ -109,18 +116,18 @@ export default function Profile() {
       console.log("Upload Photo Full Response:", data)
 
 
-      const isSuccess = data.message?.toLowerCase() === "success" || !!data.user || !!data.photo
+      const isSuccess = data.success === true || !!data.data.user || !!data.data.photo
 
       if (isSuccess) {
-        if (data.user) {
-          setUserData(data.user)
-          if (data.user._id) getUserPosts(data.user._id)
-        } else if (data.photo) {
-          setUserData(prev => ({ ...(prev || {}), photo: data.photo }))
-        } else if (data._id && data.photo) {
+        if (data.data.user) {
+          setUserData(data.data.user)
+          if (data.data.user._id) getUserPosts(data.data.user._id)
+        } else if (data.data.photo) {
+          setUserData(prev => ({ ...(prev || {}), photo: data.data.photo }))
+        } else if (data.data._id && data.data.photo) {
           // Case where data is the user object itself
           setUserData(data)
-          getUserPosts(data._id)
+          getUserPosts(data.data._id)
         }
         toast.success("Profile photo updated successfully!")
         getProfileData()
@@ -129,7 +136,7 @@ export default function Profile() {
       }
     } catch (error) {
       console.error("Upload error details:", error.response || error)
-      const errorMsg = error.response?.data?.message || "Failed to update profile photo."
+      const errorMsg = error.response?.data.data?.message || "Failed to update profile photo."
       toast.error(errorMsg)
     } finally {
       setIsUploading(false)
@@ -213,9 +220,6 @@ export default function Profile() {
           <div className="flex border-b border-gray-100">
             <button className="flex-1 py-3 sm:py-4 md:py-5 text-center text-sm sm:text-base font-bold text-blue-600 border-b-2 sm:border-b-4 border-blue-600 bg-blue-50/30">
               Posts
-            </button>
-            <button className="flex-1 py-3 sm:py-4 md:py-5 text-center text-sm sm:text-base font-bold text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition border-b-2 sm:border-b-4 border-transparent">
-              Media
             </button>
           </div>
 
