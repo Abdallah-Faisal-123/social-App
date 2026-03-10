@@ -3,9 +3,9 @@ import { db } from "../pages/Chat/firebase";
 import { getCurrentUser } from "../utils/getUser";
 
 export const sendMessage = async (otherUserId, text, senderId = null) => {
-  const currentUser = senderId ? { id: senderId } : getCurrentUser();
+  const currentUser = senderId ? { id: senderId  } : getCurrentUser();
 
-  // منع الإرسال لو البيانات ناقصة
+ 
   if (!currentUser || !currentUser.id) {
     
     return;
@@ -24,25 +24,29 @@ export const sendMessage = async (otherUserId, text, senderId = null) => {
   const chatRef = doc(db, "chats", chatId);
 
   try {
-    // إنشاء أو تحديث الدردشة
+ 
     await setDoc(chatRef, {
       users: [currentUser.id, otherUserId],
       updatedAt: serverTimestamp()
     }, { merge: true });
 
-    // إضافة الرسالة
+ 
     await addDoc(collection(db, "chats", chatId, "messages"), {
       senderId: currentUser.id,
       text: text.trim(),
       createdAt: serverTimestamp()
     });
 
-    // تحديث آخر رسالة
+ 
     await updateDoc(chatRef, {
-      lastMessage: text.trim(),
+            lastMessage: {
+        text: text.trim(),
+        senderId: userId,
+        createdAt: serverTimestamp()
+      },
       updatedAt: serverTimestamp()
     });
   } catch (err) {
-    console.error("Error sending message:", err);
+    
   }
 };

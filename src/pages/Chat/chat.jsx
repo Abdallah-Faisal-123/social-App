@@ -26,29 +26,25 @@ export default function Chat() {
     async function getlatestusers() {
         if (!token) return;
         try {
-            const { data } = await axios.get(
-                "https://linked-posts.routemisr.com/posts?limit=50",
-                {
-                    headers: { token }
-                }
-            )
-            const totalPages = data.paginationInfo.numberOfPages
             const options = {
-                url: `https://linked-posts.routemisr.com/posts?limit=50&page=${totalPages}`,
+                url: `https://route-posts.routemisr.com/posts`,
                 method: 'GET',
-                headers: { token }
+                 headers:{
+                    Authorization: `Bearer ${token}`
+                    }
             }
+            
             const lastPost = await axios.request(options)
-            const posts = lastPost.data.posts;
-
+            const posts = lastPost.data.data.posts;
+             
             // Filter unique users by their _id
             const uniqueUsersMap = new Map();
             posts.forEach(post => {
                 if (post.user && post.user._id && !uniqueUsersMap.has(post.user._id)) {
                     uniqueUsersMap.set(post.user._id, {
                         ...post.user,
-                        lastMsg: post.body.substring(0, 30) + (post.body.length > 30 ? "..." : ""),
-                        time: new Date(post.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        lastMsg:'last',
+                        time: 'at'
                     });
                 }
             });
@@ -71,14 +67,16 @@ export default function Chat() {
             if (!token) return;
             try {
                 const { data } = await axios.get(
-                    "https://linked-posts.routemisr.com/users/profile-data",
-                    { headers: { token } }
+                    "https://route-posts.routemisr.com/users/profile-data",
+                    {  headers:{
+                        Authorization: `Bearer ${token}`
+                        } }
                 );
-                if (data.user) {
+                if (data.data.user) {
                     setCurrentUser({
-                        id: data.user._id,
-                        name: data.user.name,
-                        photo: data.user.photo
+                        id: data.data.user._id,
+                        name: data.data.user.name,
+                        photo: data.data.user.photo
                     });
                 }
             } catch (error) {
