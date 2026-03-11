@@ -18,13 +18,17 @@ import {
     faPlus
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
+import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
 
 export default function Chat() {
     const [lastUsers, setLastUsers] = useState([]);
     const { token } = useContext(AuthContext);
+        const [currentUser, setCurrentUser] = useState(null);
 
     async function getlatestusers() {
-        if (!token) return;
+        if (!token || !currentUser) return;
+        
         try {
             const options = {
                 url: `https://route-posts.routemisr.com/posts`,
@@ -36,31 +40,54 @@ export default function Chat() {
             
             const lastPost = await axios.request(options)
             const posts = lastPost.data.data.posts;
-             
-            // Filter unique users by their _id
-            const uniqueUsersMap = new Map();
-            posts.forEach(post => {
-                if (post.user && post.user._id && !uniqueUsersMap.has(post.user._id)) {
-                    uniqueUsersMap.set(post.user._id, {
-                        ...post.user,
-                        lastMsg:'last',
-                        time: 'at'
-                    });
-                }
-            });
+  
+ const uniqueUsersMap = new Map();
+        posts.forEach(post => {
+          
+            if (post.user && post.user._id  !== currentUser.id && !uniqueUsersMap.has(post.user._id)) {
+                uniqueUsersMap.set(post.user._id, {
+                    ...post.user,
+                    lastMsg: 'No messages yet',
+                    time: ''
+                });
+            }
+        });
+ 
+            const usersArray = Array.from(uniqueUsersMap.values());
 
-            setLastUsers(Array.from(uniqueUsersMap.values()));
+            const updatedUsers = await Promise.all(usersArray.map(async (user) => {
+            const chatId = [currentUser.id, user._id].sort().join("_");
+            const msgsRef = collection(db, "chats", chatId, "messages");
+            const q = query(msgsRef, orderBy("createdAt", "desc"), limit(1));
+
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+                const lastDoc = querySnapshot.docs[0].data();
+                return {
+                    ...user,
+                    lastMsg: lastDoc.text || (lastDoc.img ? "Photo 📷" : ""),
+                    time: lastDoc.createdAt?.seconds
+                        ? new Date(lastDoc.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : ""
+                };
+            }
+            return user;
+        }));
+
+     
+        setLastUsers(updatedUsers);
+
 
         } catch (error) {
             console.error("Error fetching latest users:", error);
         }
     }
-
-    useEffect(() => {
+useEffect(() => {
+    if (currentUser && token) {
         getlatestusers();
-    }, [token]);
+    }
+}, [token, currentUser]);
 
-    const [currentUser, setCurrentUser] = useState(null);
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -110,6 +137,14 @@ export default function Chat() {
 
         try {
             await sendMessage(selectedUser._id, text, currentUser.id);
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            setLastUsers(prevUsers => 
+            prevUsers.map(user => 
+                user._id === selectedUser._id 
+                ? { ...user, lastMsg: text, time: now } 
+                : user
+            )
+        );
             setText("");
         } catch (error) {
             console.error("Failed to send message:", error);
