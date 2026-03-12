@@ -168,19 +168,30 @@ useEffect(() => {
     );
 
    const handleSend = async () => {
-    if (!currentUser || !selectedUser || !text.trim()) return;
+    if (!currentUser) return alert("User not loaded yet!");
+    if (!selectedUser) return alert("Select a user first!");
+    if (!text.trim()) return;
 
     try {
-        // 1. ابعت الرسالة عادي
+        // 1. إرسال الرسالة
         await sendMessage(selectedUser._id, text, currentUser.id);
+        
+        // 2. تحديث قائمة الـ UI فوراً
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setLastUsers(prevUsers => 
+            prevUsers.map(user => 
+                user._id === selectedUser._id 
+                ? { ...user, lastMsg: text, time: now } 
+                : user
+            )
+        );
 
-        // 2. الحفظ المزدوج (ليك وليه)
-        // بنبعت بياناتك أنت (currentUser) عشان تتحفظ عند الطرف التاني
-        await saveContact(currentUser.id, currentUser, selectedUser, chatId);
+        // 3. حفظ جهة الاتصال (Corrected)
+        await saveContact(currentUser.id, selectedUser, chatId);
 
         setText("");
     } catch (error) {
-        console.error("Error:", error);
+        console.error("Failed to send message:", error);
     }
 };
     return (
