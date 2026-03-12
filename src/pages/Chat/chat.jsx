@@ -187,7 +187,7 @@ useEffect(() => {
         );
 
         // 3. حفظ جهة الاتصال (Corrected)
-        await saveContact(currentUser.id, selectedUser, chatId);
+        await saveContact(currentUser.id, currentUser, selectedUser, chatId);
 
         setText("");
     } catch (error) {
