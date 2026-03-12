@@ -15,7 +15,8 @@ import {
     faVideo,
     faChevronLeft,
     faMicrophone,
-    faPlus
+    faPlus,
+    faArrowAltCircleLeft
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
@@ -205,13 +206,24 @@ useEffect(() => {
                     <div className="p-6">
                         <div className="flex items-center justify-between mb-8">
                             <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Messages</h1>
-                            <button  onClick={()=>{
-                                getAllUsers()
-                            }}
-
-                                className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg shadow-blue-200 hover:scale-110 transition-transform cursor-pointer">
-                                <FontAwesomeIcon icon={faPlus} />
-                            </button>
+                            {newContact ? (
+                               
+                                <button onClick={() => {
+                                    setLastUsers([]);
+                                    getlatestusers();
+                                    setNewContact(false);
+                                }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
+                                    <FontAwesomeIcon icon={faArrowAltCircleLeft} />
+                                </button>
+                            ) : (
+                             
+                                <button onClick={() => {
+                                    getAllUsers();
+                                    setNewContact(true);
+                                }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
+                                    <FontAwesomeIcon icon={faPlus} />
+                                </button>
+                            )} 
                         </div>
 
                         <div className="relative group">
