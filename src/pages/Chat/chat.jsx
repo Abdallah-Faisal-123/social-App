@@ -20,11 +20,13 @@ import {
 import { AuthContext } from '../../component/Authcontext/Authcontext';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
+import { saveContact } from '../../utils/useSaveContact';
 
 export default function Chat() {
     const [lastUsers, setLastUsers] = useState([]);
     const { token } = useContext(AuthContext);
         const [currentUser, setCurrentUser] = useState(null);
+        const [newContact,setNewContact] = useState(false)
 
     async function getlatestusers() {
         if (!token || !currentUser) return;
@@ -40,43 +42,42 @@ export default function Chat() {
             
             const lastPost = await axios.request(options)
             const posts = lastPost.data.data.posts;
-  
- const uniqueUsersMap = new Map();
-        posts.forEach(post => {
-          
-            if (post.user && post.user._id  !== currentUser.id && !uniqueUsersMap.has(post.user._id)) {
-                uniqueUsersMap.set(post.user._id, {
-                    ...post.user,
-                    lastMsg: 'No messages yet',
-                    time: ''
-                });
-            }
-        });
+            const uniqueUsersMap = new Map();
+            posts.forEach(post => {
+                if (post.user && post.user._id !== currentUser.id && !uniqueUsersMap.has(post.user._id)) {
+                    uniqueUsersMap.set(post.user._id, {
+                        ...post.user,
+                        lastMsg: '',
+                        time: ''
+                    });
+                }
+            });
  
             const usersArray = Array.from(uniqueUsersMap.values());
 
             const updatedUsers = await Promise.all(usersArray.map(async (user) => {
-            const chatId = [currentUser.id, user._id].sort().join("_");
-            const msgsRef = collection(db, "chats", chatId, "messages");
-            const q = query(msgsRef, orderBy("createdAt", "desc"), limit(1));
+    const chatId = [currentUser.id, user._id].sort().join("_");
+    const msgsRef = collection(db, "chats", chatId, "messages");
+    const q = query(msgsRef, orderBy("createdAt", "desc"), limit(1)); // خليها ليميت 1 كفاية
 
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-                const lastDoc = querySnapshot.docs[0].data();
-                return {
-                    ...user,
-                    lastMsg: lastDoc.text || (lastDoc.img ? "Photo 📷" : ""),
-                    time: lastDoc.createdAt?.seconds
-                        ? new Date(lastDoc.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : ""
-                };
-            }
-            return user;
-        }));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+        const lastDoc = querySnapshot.docs[0].data();
+        return {
+            ...user,
+            lastMsg: lastDoc.text || (lastDoc.img ? "Photo 📷" : ""),
+            time: lastDoc.createdAt?.seconds
+                ? new Date(lastDoc.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : ""
+        };
+    }
+    // السطر ده هو اللي هيخفي أي مستخدم مفيش بينك وبينه رسايل
+    return null; 
+}));
 
-     
-        setLastUsers(updatedUsers);
-
+// صفي المصفوفة من الـ null عشان يتبقوا اللي بينهم رسايل بس
+setLastUsers(updatedUsers.filter(u => u !== null));
 
         } catch (error) {
             console.error("Error fetching latest users:", error);
@@ -87,7 +88,42 @@ useEffect(() => {
         getlatestusers();
     }
 }, [token, currentUser]);
+       
+     async function getAllUsers() {
+    // 1. فضي القائمة القديمة (اختياري: ممكن تظهر Loading هنا)
+    setLastUsers([]); 
 
+    try {
+        const options = {
+            url: `https://route-posts.routemisr.com/posts`,
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        };
+
+        const response = await axios.request(options);
+        const posts = response.data.data.posts;
+
+        // 2. تجميع المستخدمين الفريدين (نفس المنطق بتاعك)
+        const uniqueUsersMap = new Map();
+        posts.forEach(post => {
+            if (post.user && post.user._id !== currentUser.id && !uniqueUsersMap.has(post.user._id)) {
+                uniqueUsersMap.set(post.user._id, {
+                    ...post.user,
+                    lastMsg: 'Tap to start chatting', // رسالة تشجيعية
+                    time: ''
+                });
+            }
+        });
+
+        // 3. التحديث فوراً (هنا بنعرض الكل بدون ما نسأل Firebase فيه رسايل ولا لا)
+        setLastUsers(Array.from(uniqueUsersMap.values()));
+
+    } catch (error) {
+        console.error("Error fetching all users:", error);
+    }
+}
 
     useEffect(() => {
         const fetchUserProfile = async () => {
@@ -130,27 +166,33 @@ useEffect(() => {
         user.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const handleSend = async () => {
-        if (!currentUser) return alert("User not loaded yet!");
-        if (!selectedUser) return alert("Select a user first!");
-        if (!text.trim()) return;
+   const handleSend = async () => {
+    if (!currentUser) return alert("User not loaded yet!");
+    if (!selectedUser) return alert("Select a user first!");
+    if (!text.trim()) return;
 
-        try {
-            await sendMessage(selectedUser._id, text, currentUser.id);
-            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            setLastUsers(prevUsers => 
+    try {
+        // 1. إرسال الرسالة
+        await sendMessage(selectedUser._id, text, currentUser.id);
+        
+        // 2. تحديث قائمة الـ UI فوراً
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setLastUsers(prevUsers => 
             prevUsers.map(user => 
                 user._id === selectedUser._id 
                 ? { ...user, lastMsg: text, time: now } 
                 : user
             )
         );
-            setText("");
-        } catch (error) {
-            console.error("Failed to send message:", error);
-        }
-    };
 
+        // 3. حفظ جهة الاتصال (Corrected)
+        await saveContact(currentUser.id, selectedUser, chatId);
+
+        setText("");
+    } catch (error) {
+        console.error("Failed to send message:", error);
+    }
+};
     return (
         <div className="flex h-screen bg-white overflow-hidden font-['Inter',_sans-serif]">
             {/* Sidebar - Modern List */}
@@ -163,7 +205,9 @@ useEffect(() => {
                     <div className="p-6">
                         <div className="flex items-center justify-between mb-8">
                             <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Messages</h1>
-                            <button
+                            <button  onClick={()=>{
+                                getAllUsers()
+                            }}
 
                                 className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg shadow-blue-200 hover:scale-110 transition-transform cursor-pointer">
                                 <FontAwesomeIcon icon={faPlus} />
