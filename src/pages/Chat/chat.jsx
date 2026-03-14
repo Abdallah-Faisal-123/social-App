@@ -16,7 +16,9 @@ import {
     faChevronLeft,
     faMicrophone,
     faPlus,
-    faArrowAltCircleLeft
+    faArrowAltCircleLeft,
+    faArrowLeft,
+    faArrowRight
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
@@ -28,62 +30,65 @@ export default function Chat() {
     const { token } = useContext(AuthContext);
         const [currentUser, setCurrentUser] = useState(null);
         const [newContact,setNewContact] = useState(false)
-
-    async function getlatestusers() {
-        if (!token || !currentUser) return;
-        
-        try {
-            const options = {
-                url: `https://route-posts.routemisr.com/posts`,
-                method: 'GET',
-                 headers:{
-                    Authorization: `Bearer ${token}`
-                    }
-            }
-            
-            const lastPost = await axios.request(options)
-            const posts = lastPost.data.data.posts;
-            const uniqueUsersMap = new Map();
-            posts.forEach(post => {
-                if (post.user && post.user._id !== currentUser.id && !uniqueUsersMap.has(post.user._id)) {
-                    uniqueUsersMap.set(post.user._id, {
-                        ...post.user,
-                        lastMsg: '',
-                        time: ''
-                    });
-                }
-            });
- 
-            const usersArray = Array.from(uniqueUsersMap.values());
-
-            const updatedUsers = await Promise.all(usersArray.map(async (user) => {
-    const chatId = [currentUser.id, user._id].sort().join("_");
-    const msgsRef = collection(db, "chats", chatId, "messages");
-    const q = query(msgsRef, orderBy("createdAt", "desc"), limit(1)); // خليها ليميت 1 كفاية
-
-    const querySnapshot = await getDocs(q);
+        const [loading, setLoading] = useState(false);
+async function getlatestusers() {
+    if (!token || !currentUser) return;
     
-    if (!querySnapshot.empty) {
-        const lastDoc = querySnapshot.docs[0].data();
-        return {
-            ...user,
-            lastMsg: lastDoc.text || (lastDoc.img ? "Photo 📷" : ""),
-            time: lastDoc.createdAt?.seconds
-                ? new Date(lastDoc.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : ""
-        };
-    }
-    // السطر ده هو اللي هيخفي أي مستخدم مفيش بينك وبينه رسايل
-    return null; 
-}));
+    try {
 
-// صفي المصفوفة من الـ null عشان يتبقوا اللي بينهم رسايل بس
-setLastUsers(updatedUsers.filter(u => u !== null));
-
-        } catch (error) {
-            console.error("Error fetching latest users:", error);
+        const requests = [];
+        for (let i = 1; i <= 20; i++) {
+            requests.push(
+                axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=50&page=${i}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+            );
         }
+
+        const responses = await Promise.all(requests);
+        let allPossibleContacts = [];
+        
+        responses.forEach(res => {
+            if (res.data.data.suggestions) {
+                allPossibleContacts = [...allPossibleContacts, ...res.data.data.suggestions];
+            }
+        });
+
+        const uniqueMap = new Map();
+        allPossibleContacts.forEach(u => {
+            if (u && u._id !== currentUser.id) uniqueMap.set(u._id, u);
+        });
+
+        const usersArray = Array.from(uniqueMap.values());
+
+        const updatedUsers = await Promise.all(usersArray.map(async (user) => {
+            const chatId = [currentUser.id, user._id].sort().join("_");
+            const msgsRef = collection(db, "chats", chatId, "messages");
+            const q = query(msgsRef, orderBy("createdAt", "desc"), limit(1));
+
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+                const lastDoc = querySnapshot.docs[0].data();
+                return {
+                    ...user,
+                    lastMsg: lastDoc.text || (lastDoc.img ? "Photo 📷" : ""),
+                   rawTime: lastDoc.createdAt?.seconds || 0,
+                    time: lastDoc.createdAt?.seconds
+                        ? new Date(lastDoc.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : ""
+                };
+            }
+            return null; 
+        }));
+
+        const finalResults = updatedUsers.filter(u=>u !== null).sort((a,b)=> b.rawTime - a.rawTime)
+        setLastUsers(finalResults);
+           
+    } catch (error) {
+        console.error("Error fetching latest users:", error);
     }
+}
 useEffect(() => {
     if (currentUser && token) {
         getlatestusers();
@@ -91,41 +96,60 @@ useEffect(() => {
 }, [token, currentUser]);
        
      async function getAllUsers() {
-    // 1. فضي القائمة القديمة (اختياري: ممكن تظهر Loading هنا)
+    if (!token || !currentUser) return;
+    setLoading(true)
+
     setLastUsers([]); 
 
     try {
-        const options = {
-            url: `https://route-posts.routemisr.com/posts`,
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${token}`
+        let allUsersAccumulator = [];
+        const totalPagesToFetch = 20;
+
+        const requests = [];
+        for (let i = 1; i <= totalPagesToFetch; i++) {
+        
+            requests.push(
+                axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=50&page=${i}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                })
+            );
+            
+        
+        }
+
+        
+        const responses = await Promise.all(requests);
+        
+        
+        responses.forEach(response => {
+            const pageUsers = response.data.data.suggestions;
+            if (pageUsers) {
+                allUsersAccumulator = [...allUsersAccumulator, ...pageUsers];
             }
-        };
+        });
 
-        const response = await axios.request(options);
-        const posts = response.data.data.posts;
-
-        // 2. تجميع المستخدمين الفريدين (نفس المنطق بتاعك)
+        
         const uniqueUsersMap = new Map();
-        posts.forEach(post => {
-            if (post.user && post.user._id !== currentUser.id && !uniqueUsersMap.has(post.user._id)) {
-                uniqueUsersMap.set(post.user._id, {
-                    ...post.user,
-                    lastMsg: 'Tap to start chatting', // رسالة تشجيعية
+        allUsersAccumulator.forEach(user => {
+            if (user && user._id !== currentUser.id && !uniqueUsersMap.has(user._id)) {
+                uniqueUsersMap.set(user._id, {
+                    ...user,
+                    lastMsg: 'Tap to start chatting', 
                     time: ''
                 });
             }
         });
 
-        // 3. التحديث فوراً (هنا بنعرض الكل بدون ما نسأل Firebase فيه رسايل ولا لا)
-        setLastUsers(Array.from(uniqueUsersMap.values()));
+        const finalResults = Array.from(uniqueUsersMap.values());
+        setLastUsers(finalResults);
+            
 
     } catch (error) {
-        console.error("Error fetching all users:", error);
+        console.error("Error fetching massive users list:", error);
+    } finally{
+        setLoading(false)
     }
 }
-
     useEffect(() => {
         const fetchUserProfile = async () => {
             if (!token) return;
@@ -173,10 +197,10 @@ useEffect(() => {
     if (!text.trim()) return;
 
     try {
-        // 1. إرسال الرسالة
+        
         await sendMessage(selectedUser._id, text, currentUser.id);
         
-        // 2. تحديث قائمة الـ UI فوراً
+        
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         setLastUsers(prevUsers => 
             prevUsers.map(user => 
@@ -186,7 +210,7 @@ useEffect(() => {
             )
         );
 
-        // 3. حفظ جهة الاتصال (Corrected)
+        
         await saveContact(currentUser.id, selectedUser, chatId);
 
         setText("");
@@ -207,7 +231,7 @@ useEffect(() => {
                         <div className="flex items-center justify-between mb-8">
                             <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Messages</h1>
                             {newContact ? (
-                               
+                               <>
                                 <button onClick={() => {
                                     setLastUsers([]);
                                     getlatestusers();
@@ -215,6 +239,8 @@ useEffect(() => {
                                 }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
                                     <FontAwesomeIcon icon={faArrowAltCircleLeft} />
                                 </button>
+                                
+                                </>
                             ) : (
                              
                                 <button onClick={() => {
@@ -224,6 +250,7 @@ useEffect(() => {
                                     <FontAwesomeIcon icon={faPlus} />
                                 </button>
                             )} 
+                            
                         </div>
 
                         <div className="relative group">
@@ -242,7 +269,7 @@ useEffect(() => {
 
                     {/* Contact List */}
                     <div className="flex-1 overflow-y-auto px-3 space-y-1">
-                        {Array.isArray(filteredUsers) && filteredUsers.length > 0 ? (
+                            {Array.isArray(filteredUsers) && filteredUsers.length > 0 ? (
                             filteredUsers.map((user) => (
                                 <div
                                     key={user._id}
