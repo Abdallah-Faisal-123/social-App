@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext,useRef } from 'react';
 import { getCurrentUser } from "../../utils/getUser";
 import { useChatMessages } from "../../utils/useChatMessages";
 import { sendMessage } from "../../utils/sendMessage";
@@ -31,7 +31,8 @@ export default function Chat() {
         const [currentUser, setCurrentUser] = useState(null);
         const [newContact,setNewContact] = useState(false)
         const [loading, setLoading] = useState(false);
-async function getlatestusers() {
+        const scrollRef = useRef(null);
+    async function getlatestusers() {
     if (!token || !currentUser) return;
     
     try {
@@ -190,11 +191,19 @@ useEffect(() => {
     const filteredUsers = lastUsers.filter(user =>
         user.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+    useEffect(() => {
+    if (scrollRef.current) {
+        scrollRef.current.scrollTo({
+            top: scrollRef.current.scrollHeight,
+            behavior: 'smooth' // عشان ينزل بشكل ناعم مش فجائي
+        });
+    }
+}, [messages]);
 
    const handleSend = async () => {
     if (!currentUser) return alert("User not loaded yet!");
     if (!selectedUser) return alert("Select a user first!");
-    if (!text.trim()) return;
+    if (!text.trim()) return alert("Write a Message");
 
     try {
         
@@ -363,7 +372,9 @@ useEffect(() => {
                         </header>
 
                         {/* Dynamic Messages Area */}
-                        <div className="flex-1 overflow-y-auto px-6 py-8 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed overflow-x-hidden scrollbar-hide">
+                        <div 
+                          ref={scrollRef}
+                        className="flex-1 overflow-y-auto px-6 py-8 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed overflow-x-hidden scrollbar-hide">
                             {messages.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-full text-gray-400">
                                     <p className="text-sm font-medium">No messages yet.</p>
