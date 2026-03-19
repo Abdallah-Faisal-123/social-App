@@ -159,7 +159,7 @@ export default function Profile() {
       <div className="container mx-auto max-w-4xl px-2 sm:px-4">
 
         <div className="relative">
-          <div className="h-40 sm:h-48 md:h-56 lg:h-64 bg-gradient-to-r from-blue-400 to-purple-500 rounded-b-xl sm:rounded-b-2xl overflow-hidden shadow-lg">
+          <div className="h-40 sm:h-48 md:h-56 lg:h-64 bg-linear-to-r from-blue-400 to-purple-500 rounded-b-xl sm:rounded-b-2xl overflow-hidden shadow-lg">
           </div>
 
 

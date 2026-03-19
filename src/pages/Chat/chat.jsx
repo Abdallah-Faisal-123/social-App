@@ -4,7 +4,6 @@ import { useChatMessages } from "../../utils/useChatMessages";
 import { sendMessage } from "../../utils/sendMessage";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import axios from "axios";
-
 import {
     faSearch,
     faPaperPlane,
@@ -21,8 +20,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
 import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from './firebase';
+
 import { saveContact } from '../../utils/useSaveContact';
+import { db } from './firebase';
 
 export default function Chat() {
     const [lastUsers, setLastUsers] = useState([]);
@@ -30,15 +30,19 @@ export default function Chat() {
         const [currentUser, setCurrentUser] = useState(null);
         const [newContact,setNewContact] = useState(false)
         const [loading, setLoading] = useState(false);
-        const [moreFrnds,setMoreFrnds] = useState(25)
         const scrollRef = useRef(null);
-        
+        const [uploading, setUploading] = useState(false);     
+        // تعديل تعريف الـ State في بداية الكومبوننت
+const [moreFrnds, setMoreFrnds] = useState(() => {
+    const savedPage = localStorage.getItem("lastPaginationPage");
+    return savedPage ? parseInt(savedPage) : 25; // لو مفيش، ابدأ بـ 25
+});   
         useEffect(()=>{
               setLoading(false)
               if(loading === false){
               setTimeout(() => {
                 setLoading(true)
-              },13000);
+              },14000);
               }
         },[])
     async function getlatestusers() {
@@ -93,14 +97,23 @@ export default function Chat() {
         }));
 
         const finalResults = updatedUsers.filter(u=>u !== null).sort((a,b)=> b.rawTime - a.rawTime)
-        setLastUsers(finalResults);
-         setLoading(true)  
+         
+        localStorage.setItem("savedUsers",JSON.stringify(finalResults))
+        
+        //setLastUsers(finalResults)
+        setLoading(true)  
     } catch (error) {
         console.error("Error fetching latest users:", error);
     }
 }
+function getSavedUsers(){
+    
+        const saved = localStorage.getItem("savedUsers")
+        setLastUsers(JSON.parse(saved)) 
+}
 useEffect(() => {
     if (currentUser && token) {
+        getSavedUsers()
         getlatestusers();
     }
 }, [token, currentUser]);
@@ -210,35 +223,62 @@ useEffect(() => {
     }
 }, [messages]);
 
-   const handleSend = async () => {
-    if (!currentUser) return alert("User not loaded yet!");
-    if (!selectedUser) return alert("Select a user first!");
-    if (!text.trim()) return alert("Write a Message");
-
+const handleSend = async () => {
+    // ... كود التحقق (Validation)
     try {
-        
         await sendMessage(selectedUser._id, text, currentUser.id);
         
-        
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setLastUsers(prevUsers => 
-            prevUsers.map(user => 
-                user._id === selectedUser._id 
-                ? { ...user, lastMsg: text, time: now } 
-                : user
-            )
-        );
-
         
-        await saveContact(currentUser.id, selectedUser, chatId);
+        setLastUsers(prevUsers => {
+            const updated = prevUsers.map(user => 
+                user._id === selectedUser._id 
+                ? { ...user, lastMsg: text, time: now, rawTime: Date.now() / 1000 } 
+                : user
+            );
+            // احفظ التحديث الجديد في الـ Local Storage فوراً
+            localStorage.setItem("savedUsers", JSON.stringify(updated));
+            return updated;
+        });
 
+        await saveContact(currentUser.id, selectedUser, chatId);
         setText("");
     } catch (error) {
-        console.error("Failed to send message:", error);
+        console.error(error);
     }
 };
-    return (
-        <div className="flex h-screen bg-white overflow-hidden font-['Inter',_sans-serif]">
+
+
+
+const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "images"); // حط الـ Preset بتاعك هنا
+
+    setUploading(true);
+    try {
+        const res = await axios.post(
+            "https://api.cloudinary.com/v1_1/dvzdfcwfa/image/upload", // حط الـ Cloud Name هنا
+            formData
+        );
+        const downloadURL = res.data.secure_url;
+
+        // ابعت الرابط لـ Firebase (الرسائل) زي ما إحنا
+        await sendMessage(selectedUser._id, "", currentUser.id, downloadURL);
+        
+        setLastUsers(prev => prev.map(u => 
+            u._id === selectedUser._id ? { ...u, lastMsg: "Photo 📷" } : u
+        ));
+    } catch (err) {
+        console.error("Cloudinary Error:", err);
+    } finally {
+        setUploading(false);
+    }
+};   return (
+        <div className="flex h-screen bg-white overflow-hidden font-['Inter',sans-serif]">
             {/* Sidebar - Modern List */}
             <aside
                 className={`${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -254,15 +294,17 @@ useEffect(() => {
                                 <button onClick={() => {
                                     setLastUsers([]);
                                     getlatestusers();
+                                    getSavedUsers()
                                     setNewContact(false);
                                 }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
                                     <FontAwesomeIcon icon={faArrowAltCircleLeft} />
                                 </button>
                                    
                                 <button onClick={() => {
-                                    setMoreFrnds(moreFrnds + 1);
-                                    
-                                    getAllUsers()
+                                    const nextBatch = moreFrnds + 1;
+                                    setMoreFrnds(nextBatch);
+                                    localStorage.setItem("lastPaginationPage", nextBatch.toString());
+                                    getAllUsers();
                                 }} className="w-11 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
                                   more   
                                 </button>                                
@@ -311,7 +353,7 @@ useEffect(() => {
                                         : 'hover:bg-white hover:shadow-md'
                                         }`}
                                 >
-                                    <div className="relative flex-shrink-0">
+                                    <div className="relative shrink-0">
                                         <div className={`p-0.5 rounded-full ${selectedUser?._id === user._id ? 'bg-white/20' : 'bg-transparent'}`}>
                                             <img src={user?.photo || user?.avatar} alt={user?.name} className="w-14 h-14 rounded-full bg-white object-cover shadow-inner" />
                                         </div>
@@ -381,7 +423,7 @@ useEffect(() => {
                                     <FontAwesomeIcon icon={faChevronLeft} />
                                 </button>
 
-                                <div className="relative flex-shrink-0 cursor-pointer group">
+                                <div className="relative shrink-0 cursor-pointer group">
                                     <img
                                         src={selectedUser?.photo || selectedUser?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=Default"}
                                         className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover ring-2 ring-transparent group-hover:ring-blue-100 transition-all"
@@ -444,7 +486,7 @@ useEffect(() => {
                         {/* Premium Input Bar */}
                         <div className="p-6 bg-white border-t border-gray-100">
                             <div className="max-w-4xl mx-auto flex items-center space-x-3">
-                                <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-3xl px-4 py-2 transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 focus-within:bg-white shadow-inner">
+                                <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-3xl pl-4 pr-11 py-2 relative transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 focus-within:bg-white shadow-inner">
                                     <input
                                         value={text}
                                         onChange={(e) => setText(e.target.value)}
@@ -458,9 +500,29 @@ useEffect(() => {
                                         placeholder="Type your message..."
                                         className="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 text-sm font-medium py-3 px-4 placeholder-gray-400 outline-none"
                                     />
+                                    <div className=" absolute bg-gray-50  size-6 right-10">
+                                        
+                                        {uploading ?<span className="text-xs text-blue-500 animate-pulse mr-2 -mt-2">Uploading...</span>
+                                        :
+                                        <>
+                                        <label className="ml-2 cursor-pointer text-gray-400 hover:text-blue-600 transition-colors">
+                                            <FontAwesomeIcon icon={faImage} className="text-2xl" />
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                className="hidden" 
+                                                onChange={handleImageUpload}
+                                                disabled={uploading}
+                                            />
+                                        </label>
+
+                                        </>
+                                        }
+                                    </div>
                                 </div>
+
                                 <button onClick={handleSend}
-                                    className="w-14 h-14 flex-shrink-0 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-xl shadow-blue-200 transition-all active:scale-95 group">
+                                    className="w-14 h-14 shrink-0 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-xl shadow-blue-200 transition-all active:scale-95 group">
                                     <FontAwesomeIcon icon={faPaperPlane} className="group-hover:rotate-12 transition-transform" />
                                 </button>
                             </div>

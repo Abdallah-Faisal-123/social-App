@@ -1,52 +1,30 @@
-import { addDoc, collection, doc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../pages/Chat/firebase";
-import { getCurrentUser } from "../utils/getUser";
+import { addDoc, collection,  serverTimestamp } from "firebase/firestore";
 
-export const sendMessage = async (otherUserId, text, senderId = null) => {
-  const currentUser = senderId ? { id: senderId  } : getCurrentUser();
+export const sendMessage   = async (recipientId, text, senderId, imageUrl = null) => {
+    // التأكد من وجود البيانات الأساسية
+    if (!senderId || !recipientId) {
+        console.error("Missing senderId or recipientId");
+        return;
+    }
 
- 
-  if (!currentUser || !currentUser.id) {
-    
-    return;
-  }
-  if (!otherUserId) {
-    console.error("No recipient selected");
-    return;
-  }
-  if (!text || !text.trim()) {
-    console.error("Message is empty");
-    return;
-  }
+    try {
+        // تكوين الـ ID بنفس الطريقة التي يقرأ بها الـ Hook (useChatMessages)
+        const chatId = [senderId, recipientId].sort().join("_");
+        
+        const messagesRef = collection(db, "chats", chatId, "messages");
 
-  const chatId = [currentUser.id, otherUserId].sort().join("_");
+        await addDoc(messagesRef, {
+            senderId,
+            text: text || "",
+            img: imageUrl || null,
+            createdAt: serverTimestamp(),
+        });
 
-  const chatRef = doc(db, "chats", chatId);
-
-  try {
- 
-    await setDoc(chatRef, {
-      users: [currentUser.id, otherUserId],
-      updatedAt: serverTimestamp()
-    }, { merge: true });
-
- 
-    await addDoc(collection(db, "chats", chatId, "messages"), {
-      senderId: currentUser.id,
-      text: text.trim(),
-      createdAt: serverTimestamp()
-    });
-
- 
-    await updateDoc(chatRef, {
-            lastMessage: {
-        text: text.trim(),
-        senderId: userId,
-        createdAt: serverTimestamp()
-      },
-      updatedAt: serverTimestamp()
-    });
-  } catch (err) {
-    
-  }
+        return true; 
+    } catch (error) {
+        console.error("Firebase AddDoc Error:", error);
+        alert("حدث خطأ في قاعدة البيانات: " + error.message);
+        throw error;
+    }
 };

@@ -26,3 +26,16 @@ export const useChatMessages = (chatId) => {
 
   return messages;
 };
+
+/* 
+export const sendMessage = async (receiverId, text, senderId, imageUrl = null) => {
+    const chatId = [senderId, receiverId].sort().join("_");
+    const msgsRef = collection(db, "chats", chatId, "messages");
+
+    await addDoc(msgsRef, {
+        senderId,
+        text,
+        img: imageUrl, // هنا بنخزن رابط الصورة
+        createdAt: serverTimestamp(),
+    });
+}; */
