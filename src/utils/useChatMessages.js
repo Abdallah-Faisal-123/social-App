@@ -5,9 +5,16 @@ import { db } from "../../src/pages/Chat/firebase";
 
 export const useChatMessages = (chatId) => {
   const [messages, setMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
 
   useEffect(() => {
-    if (!chatId) return;
+    if (!chatId) {
+        setMessages([]);
+        setLoadingMessages(false);
+        return;
+    }
+
+    setLoadingMessages(true);
 
     const q = query(
       collection(db, "chats", chatId, "messages"),
@@ -19,12 +26,13 @@ export const useChatMessages = (chatId) => {
         id: doc.id,
         ...doc.data()
       })));
+      setLoadingMessages(false);
     });
 
     return () => unsub();
   }, [chatId]);
 
-  return messages;
+  return { messages, loadingMessages };
 };
 
 /* 

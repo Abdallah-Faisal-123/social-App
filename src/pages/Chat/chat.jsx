@@ -211,7 +211,7 @@ useEffect(() => {
         ? [currentUser.id, selectedUser._id].sort().join("_")
         : null;
 
-    const messages = useChatMessages(chatId);
+    const { messages, loadingMessages } = useChatMessages(chatId);
 
     const [selectedUserOnline, setSelectedUserOnline] = useState(false);
 
@@ -471,13 +471,13 @@ const handleImageUpload = async (e) => {
                 ) : (
                     <>
                         {/* Modern Header */}
-                        <header className="h-20 sm:h-24 flex items-center justify-between px-6 border-b border-gray-100/80 bg-white/70 backdrop-blur-xl sticky top-0 z-30">
+                        <header className="h-16 sm:h-24 flex items-center justify-between px-4 sm:px-6 border-b border-gray-100/80 bg-white/70 backdrop-blur-xl sticky top-0 z-30">
                             <div className="flex items-center min-w-0">
                                 <button
                                     onClick={() => setMobileSidebarOpen(true)}
-                                    className="lg:hidden mr-4 p-2.5 text-gray-500 hover:bg-gray-100 rounded-xl transition-all"
+                                    className="lg:hidden mr-2 p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-all"
                                 >
-                                    <FontAwesomeIcon icon={faChevronLeft} />
+                                    <FontAwesomeIcon icon={faChevronLeft} className="text-lg" />
                                 </button>
 
                                 <div className="relative shrink-0 cursor-pointer group">
@@ -504,8 +504,16 @@ const handleImageUpload = async (e) => {
                         {/* Dynamic Messages Area */}
                         <div 
                           ref={scrollRef}
-                        className="flex-1 overflow-y-auto px-6 py-8 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed overflow-x-hidden scrollbar-hide">
-                            {messages.length === 0 ? (
+                        className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed overflow-x-hidden scrollbar-hide">
+                            {loadingMessages ? (
+                                <div className="flex flex-col space-y-4">
+                                    {[...Array(6)].map((_, i) => (
+                                        <div key={i} className={`flex items-end space-x-3 group animate-pulse ${i % 2 === 0 ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`w-2/3 sm:max-w-md ${i % 2 === 0 ? 'bg-blue-100' : 'bg-white'} rounded-2xl ${i % 2 === 0 ? 'rounded-br-none' : 'rounded-bl-none'} shadow-sm h-16`}></div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : messages.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-full text-gray-400">
                                     <p className="text-sm font-medium">No messages yet.</p>
                                     <p className="text-xs">Send a message to start the conversation!</p>
@@ -550,9 +558,9 @@ const handleImageUpload = async (e) => {
                         </div>
 
                         {/* Premium Input Bar */}
-                        <div className="p-6 bg-white border-t border-gray-100">
-                            <div className="max-w-4xl mx-auto flex items-center space-x-3">
-                                <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-3xl pl-4 pr-11 py-2 relative transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 focus-within:bg-white shadow-inner">
+                        <div className="p-3 sm:p-6 bg-white border-t border-gray-100">
+                            <div className="max-w-4xl mx-auto flex items-center space-x-2 sm:space-x-3">
+                                <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-3xl pl-3 sm:pl-4 pr-12 sm:pr-14 py-1.5 sm:py-2 relative transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 focus-within:bg-white shadow-inner">
                                     <input
                                         value={text}
                                         onChange={(e) => setText(e.target.value)}
@@ -563,33 +571,30 @@ const handleImageUpload = async (e) => {
                                             }
                                         }}
                                         type="text"
-                                        placeholder="Type your message..."
-                                        className="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 text-sm font-medium py-3 px-4 placeholder-gray-400 outline-none"
+                                        placeholder="Message..."
+                                        className="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 text-sm font-medium py-2.5 sm:py-3 px-2 sm:px-4 placeholder-gray-400 outline-none w-full"
                                     />
-                                    <div className=" absolute bg-gray-50  size-6 right-10">
-                                        
-                                        {uploading ?<span className="text-xs text-blue-500 animate-pulse mr-2 -mt-2">Uploading...</span>
-                                        :
-                                        <>
-                                        <label className="ml-2 cursor-pointer text-gray-400 hover:text-blue-600 transition-colors">
-                                            <FontAwesomeIcon icon={faImage} className="text-2xl" />
-                                            <input 
-                                                type="file" 
-                                                accept="image/*" 
-                                                className="hidden" 
-                                                onChange={handleImageUpload}
-                                                disabled={uploading}
-                                            />
-                                        </label>
-
-                                        </>
-                                        }
+                                    <div className="absolute right-2 sm:right-4 flex items-center bg-transparent">
+                                        {uploading ? (
+                                            <span className="text-xs text-blue-500 animate-pulse font-medium mr-1">...</span>
+                                        ) : (
+                                            <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors p-1.5 flex items-center justify-center">
+                                                <FontAwesomeIcon icon={faImage} className="text-xl sm:text-2xl" />
+                                                <input 
+                                                    type="file" 
+                                                    accept="image/*" 
+                                                    className="hidden" 
+                                                    onChange={handleImageUpload}
+                                                    disabled={uploading}
+                                                />
+                                            </label>
+                                        )}
                                     </div>
                                 </div>
 
                                 <button onClick={handleSend}
-                                    className="w-14 h-14 shrink-0 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-xl shadow-blue-200 transition-all active:scale-95 group">
-                                    <FontAwesomeIcon icon={faPaperPlane} className="group-hover:rotate-12 transition-transform" />
+                                    className="w-11 h-11 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full sm:rounded-2xl shadow-lg sm:shadow-xl shadow-blue-200 transition-all active:scale-95 group">
+                                    <FontAwesomeIcon icon={faPaperPlane} className="group-hover:rotate-12 transition-transform text-sm sm:text-base" />
                                 </button>
                             </div>
                         </div>
