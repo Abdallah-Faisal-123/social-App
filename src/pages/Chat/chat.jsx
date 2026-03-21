@@ -33,6 +33,9 @@ export default function Chat() {
         const [loading, setLoading] = useState(false);
         const scrollRef = useRef(null);
         const [uploading, setUploading] = useState(false);     
+        const [isRecording, setIsRecording] = useState(false);
+        const mediaRecorderRef = useRef(null);
+        const audioChunksRef = useRef([]);
         // تعديل تعريف الـ State في بداية الكومبوننت
 const [moreFrnds, setMoreFrnds] = useState(() => {
     const savedPage = localStorage.getItem("lastPaginationPage");
@@ -325,6 +328,69 @@ const handleImageUpload = async (e) => {
     } finally {
         setUploading(false);
     }
+};
+
+const startRecording = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunksRef.current.push(event.data);
+            }
+        };
+
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            const audioFile = new File([audioBlob], 'voice_message.webm', { type: 'audio/webm' });
+            uploadAudioFile(audioFile);
+            
+            stream.getTracks().forEach(track => track.stop());
+        };
+
+        mediaRecorder.start();
+        setIsRecording(true);
+    } catch (err) {
+        console.error("Microphone access error:", err);
+        alert("Could not access microphone. Please check permissions!");
+    }
+};
+
+const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+    }
+};
+
+const uploadAudioFile = async (file) => {
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "images"); 
+
+    setUploading(true);
+    try {
+        const res = await axios.post(
+            "https://api.cloudinary.com/v1_1/dvzdfcwfa/video/upload", 
+            formData
+        );
+        const downloadURL = res.data.secure_url;
+
+        await sendMessage(selectedUser._id, "", currentUser.id, null, downloadURL);
+        
+        setLastUsers(prev => prev.map(u => 
+            u._id === selectedUser._id ? { ...u, lastMsg: "Voice message 🎤" } : u
+        ));
+    } catch (err) {
+        console.error("Cloudinary Audio Error:", err);
+    } finally {
+        setUploading(false);
+    }
 };   return (
         <div className="flex h-screen bg-white overflow-hidden font-['Inter',sans-serif]">
             {/* Sidebar - Modern List */}
@@ -536,6 +602,9 @@ const handleImageUpload = async (e) => {
                                             {message.img && (
                                                 <img src={message.img} className="rounded-xl w-full h-auto mb-2" alt="Attachment" />
                                             )}
+                                            {message.audio && (
+                                                <audio src={message.audio} controls className="mb-2 max-w-[200px] sm:max-w-xs h-10" />
+                                            )}
                                             {message.text && (
                                                 <p className="text-sm leading-relaxed font-medium">{message.text}</p>
                                             )}
@@ -571,13 +640,21 @@ const handleImageUpload = async (e) => {
                                             }
                                         }}
                                         type="text"
-                                        placeholder="Message..."
+                                        placeholder={isRecording ? "Recording audio..." : "Message..."}
+                                        disabled={isRecording}
                                         className="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 text-sm font-medium py-2.5 sm:py-3 px-2 sm:px-4 placeholder-gray-400 outline-none w-full"
                                     />
                                     <div className="absolute right-2 sm:right-4 flex items-center bg-transparent">
                                         {uploading ? (
                                             <span className="text-xs text-blue-500 animate-pulse font-medium mr-1">...</span>
                                         ) : (
+                                            <>
+                                            <button 
+                                                onClick={isRecording ? stopRecording : startRecording}
+                                                className={`cursor-pointer transition-colors p-1.5 flex items-center justify-center rounded-full ${isRecording ? 'text-red-500 animate-pulse bg-red-50' : 'text-gray-400 hover:text-blue-600'}`}
+                                            >
+                                                <FontAwesomeIcon icon={faMicrophone} className="text-xl sm:text-2xl" />
+                                            </button>
                                             <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors p-1.5 flex items-center justify-center">
                                                 <FontAwesomeIcon icon={faImage} className="text-xl sm:text-2xl" />
                                                 <input 
@@ -588,6 +665,7 @@ const handleImageUpload = async (e) => {
                                                     disabled={uploading}
                                                 />
                                             </label>
+                                            </>
                                         )}
                                     </div>
                                 </div>

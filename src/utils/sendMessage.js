@@ -1,7 +1,7 @@
 import { db } from "../pages/Chat/firebase";
 import { addDoc, collection,  serverTimestamp } from "firebase/firestore";
 
-export const sendMessage   = async (recipientId, text, senderId, imageUrl = null) => {
+export const sendMessage   = async (recipientId, text, senderId, imageUrl = null, audioUrl = null) => {
     // التأكد من وجود البيانات الأساسية
     if (!senderId || !recipientId) {
         console.error("Missing senderId or recipientId");
@@ -18,6 +18,7 @@ export const sendMessage   = async (recipientId, text, senderId, imageUrl = null
             senderId,
             text: text || "",
             img: imageUrl || null,
+            audio: audioUrl || null,
             createdAt: serverTimestamp(),
             read: false,
         });
