@@ -11,9 +11,6 @@ export default function Feed() {
 
   async function gitAllPosts() {
     try {
-      
-      
-      
       const options = {
         url: `https://route-posts.routemisr.com/posts`,
         method: 'GET',
@@ -22,23 +19,9 @@ export default function Feed() {
         }
       }
       const{data} = await axios.request(options)
-      
-      
       setPosts(data.data.posts)
-
-      /* const options = {
-         url: `https://linked-posts.routemisr.com/posts?limit=50&page=83`,
-         method: 'GET',
-         headers: { token }
-       }
- 
-       const { data } = await axios.request(options)
-       console.log(data)
-       setPosts(data.posts)
-        */
     } catch (error) {
       console.log(error)
-      
     }
   }
   useEffect(() => {
@@ -49,13 +32,15 @@ export default function Feed() {
     <>
       <UploadPoast />
 
-      {posts ? <div className="py-3 md:py-5"> <div className="w-full sm:max-w-xl sm:mx-auto bg-gray-200 rounded px-0 sm:px-2">
-        {
-          [...posts].map((post) => <PostCard key={post._id} postInfo={post} />)
-        }
-      </div>  </div> : <Loading cards={"Posts"} />}
-
-
+      {posts ? (
+        <div className="py-4 md:py-6">
+          <div className="w-full sm:max-w-xl sm:mx-auto px-0 sm:px-2 stagger-children">
+            {[...posts].map((post) => <PostCard key={post._id} postInfo={post} />)}
+          </div>
+        </div>
+      ) : (
+        <Loading cards={"Posts"} />
+      )}
     </>
   )
 }

@@ -18,7 +18,6 @@ export default function Profile() {
   const [isUploading, setIsUploading] = useState(false)
 
   async function getUserPosts(userId) {
-    
     try {
       const options = {
         url: `https://route-posts.routemisr.com/users/${userId}/posts`,
@@ -27,9 +26,7 @@ export default function Profile() {
           Authorization: `Bearer ${token}`
         }
       }
-
       const { data } = await axios.request(options)
-      console.log("User Posts API Response:", data)
       setUserPosts(data.data.posts || [])
       setLoading(false)
     } catch (error) {
@@ -47,20 +44,15 @@ export default function Profile() {
           Authorization: `Bearer ${token}`
         }
       }
-
       const { data } = await axios.request(options)
-      console.log("Profile Data API Response:", data)
-
       if (data.data.user) {
         setUserData(data.data.user)
-
         getUserPosts(data.data.user._id)
       } else {
         setLoading(false)
       }
     } catch (error) {
       console.error("Error fetching profile data:", error)
-
       try {
         const decoded = jwtDecode(token);
         setUserData({
@@ -85,7 +77,6 @@ export default function Profile() {
   const handlePhotoUpload = async (event) => {
     const file = event.target.files[0]
     if (!file) return
-
 
     if (file.size > 5 * 1024 * 1024) {
       toast.error('File is too large (max: 5MB)')
@@ -113,8 +104,6 @@ export default function Profile() {
       }
 
       const { data } = await axios.request(options)
-      console.log("Upload Photo Full Response:", data)
-
 
       const isSuccess = data.success === true || !!data.data.user || !!data.data.photo
 
@@ -125,17 +114,13 @@ export default function Profile() {
         } else if (data.data.photo) {
           setUserData(prev => ({ ...(prev || {}), photo: data.data.photo }))
         } else if (data.data._id && data.data.photo) {
-          // Case where data is the user object itself
           setUserData(data)
           getUserPosts(data.data._id)
         }
         toast.success("Profile photo updated successfully!")
         getProfileData()
-      } else {
-        console.warn("Upload reported success but data structure was unexpected:", data)
       }
     } catch (error) {
-      console.error("Upload error details:", error.response || error)
       const errorMsg = error.response?.data.data?.message || "Failed to update profile photo."
       toast.error(errorMsg)
     } finally {
@@ -153,30 +138,34 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 font-['Roboto']">
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
 
-      <div className="container mx-auto max-w-4xl px-2 sm:px-4">
+      <div className="container mx-auto max-w-4xl px-2 sm:px-4 animate-fade-in-up">
 
+        {/* Cover Photo */}
         <div className="relative">
-          <div className="h-40 sm:h-48 md:h-56 lg:h-64 bg-linear-to-r from-blue-400 to-purple-500 rounded-b-xl sm:rounded-b-2xl overflow-hidden shadow-lg">
+          <div className="h-44 sm:h-52 md:h-60 lg:h-72 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-400 rounded-b-3xl overflow-hidden shadow-xl animate-gradient">
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%23ffffff%22 fill-opacity=%220.05%22%3E%3Cpath d=%22M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')]"></div>
           </div>
 
-
-          <div className="absolute -bottom-12 sm:-bottom-14 md:-bottom-16 left-4 sm:left-6 md:left-8">
+          {/* Profile Picture */}
+          <div className="absolute -bottom-14 sm:-bottom-16 md:-bottom-18 left-4 sm:left-6 md:left-8">
             <div className="relative group">
-              <img
-                src={userData?.photo || "https://i.pravatar.cc/300?img=12"}
-                alt={userData?.name}
-                className="size-24 sm:size-28 md:size-32 rounded-full border-2 sm:border-4 border-white shadow-xl bg-white object-cover"
-              />
+              <div className="p-1 bg-white rounded-full shadow-xl">
+                <img
+                  src={userData?.photo || "https://i.pravatar.cc/300?img=12"}
+                  alt={userData?.name}
+                  className="size-24 sm:size-28 md:size-32 rounded-full bg-white object-cover"
+                />
+              </div>
               {isUploading ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-full">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-full">
                   <FontAwesomeIcon icon={faSpinner} className="text-white text-xl md:text-2xl animate-spin" />
                 </div>
               ) : (
-                <label className="absolute bottom-0 right-0 bg-blue-500 text-white rounded-full p-1.5 sm:p-2 shadow-lg hover:bg-blue-600 transition cursor-pointer transform hover:scale-110">
-                  <FontAwesomeIcon icon={faCamera} className="text-xs sm:text-sm -mb-2" />
+                <label className="absolute bottom-1 right-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-full w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center shadow-lg shadow-indigo-300 hover:scale-110 transition-transform cursor-pointer">
+                  <FontAwesomeIcon icon={faCamera} className="text-xs" />
                   <FormField
                     elementType={'file'}
                     type={'file'}
@@ -191,24 +180,24 @@ export default function Profile() {
         </div>
 
         {/* Profile Info Section */}
-        <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl mt-14 sm:mt-16 md:mt-20 p-4 sm:p-6 md:p-8">
+        <div className="bg-white rounded-3xl shadow-lg border border-slate-100/80 mt-16 sm:mt-18 md:mt-22 p-5 sm:p-6 md:p-8">
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
             <div className="flex-1 w-full">
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900">{userData?.name || "User"}</h1>
-              <p className="text-sm sm:text-base text-gray-500 font-medium mt-1">@{userData?.name?.toLowerCase().replace(/\s+/g, '') || "user"}</p>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-800 tracking-tight">{userData?.name || "User"}</h1>
+              <p className="text-sm text-slate-400 font-medium mt-0.5">@{userData?.name?.toLowerCase().replace(/\s+/g, '') || "user"}</p>
 
               {/* Stats */}
-              <div className="flex gap-6 sm:gap-8 md:gap-10 mt-4 sm:mt-6 md:mt-8">
+              <div className="flex gap-8 mt-6">
                 <div className="text-center">
-                  <p className="text-xl sm:text-2xl font-bold text-blue-600">{userPosts?.length || 0}</p>
-                  <p className="text-gray-500 text-xs sm:text-sm font-semibold uppercase tracking-wider">Posts</p>
+                  <p className="text-2xl font-extrabold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">{userPosts?.length || 0}</p>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mt-0.5">Posts</p>
                 </div>
               </div>
             </div>
 
             {/* Action Button */}
             <div className="w-full sm:w-auto">
-              <button className="w-full sm:w-auto bg-blue-600 text-white px-6 sm:px-8 py-2 sm:py-2.5 rounded-full text-sm sm:text-base font-bold hover:bg-blue-700 transition shadow-lg transform hover:-translate-y-0.5 active:translate-y-0">
+              <button className="w-full sm:w-auto bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white px-7 py-2.5 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-200 transition-all duration-200 active:scale-95 cursor-pointer">
                 Edit Profile
               </button>
             </div>
@@ -216,28 +205,28 @@ export default function Profile() {
         </div>
 
         {/* Tabs Section */}
-        <div className="bg-white lg:px-25 rounded-xl sm:rounded-2xl shadow-lg sm:shadow-xl mt-4 sm:mt-6 md:mt-8 mb-6 sm:mb-8  md:mb-12 overflow-hidden">
-          <div className="flex border-b border-gray-100">
-            <button className="flex-1 py-3 sm:py-4 md:py-5 text-center text-sm sm:text-base font-bold text-blue-600 border-b-2 sm:border-b-4 border-blue-600 bg-blue-50/30">
+        <div className="bg-white rounded-3xl shadow-lg border border-slate-100/80 mt-4 sm:mt-6 mb-8 md:mb-12 overflow-hidden">
+          <div className="flex border-b border-slate-100">
+            <button className="flex-1 py-3.5 sm:py-4 text-center text-sm font-bold text-indigo-600 border-b-[3px] border-indigo-500 bg-indigo-50/40">
               Posts
             </button>
           </div>
 
           {/* Posts Content */}
-          <div className=" sm:p-6 md:p-8 bg-gray-50/50  sm:mx-0 md:mx-11">
+          <div className="p-3 sm:p-5 md:p-6 bg-slate-50/30">
             {userPosts && userPosts.length > 0 ? (
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4 max-w-2xl mx-auto stagger-children">
                 {[...userPosts].reverse().map((post) => (
                   <PostCard key={post._id} postInfo={post} />
                 ))}
               </div>
             ) : (
-              <div className="text-center text-gray-400 py-12 sm:py-16 md:py-20 flex flex-col items-center">
-                <div className="bg-white p-4 sm:p-6 rounded-full shadow-md mb-3 sm:mb-4">
-                  <FontAwesomeIcon icon={faUser} className="text-3xl sm:text-4xl text-gray-200" />
+              <div className="text-center text-slate-400 py-16 md:py-24 flex flex-col items-center animate-fade-in-up">
+                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-5 rounded-2xl mb-4">
+                  <FontAwesomeIcon icon={faUser} className="text-3xl text-indigo-300" />
                 </div>
-                <p className="text-lg sm:text-xl font-bold text-gray-500">No posts yet</p>
-                <p className="text-xs sm:text-sm mt-2 max-w-xs mx-auto px-4">When you share thoughts, they'll appear here on your profile.</p>
+                <p className="text-lg font-bold text-slate-500">No posts yet</p>
+                <p className="text-sm mt-2 max-w-xs mx-auto text-slate-400">When you share thoughts, they'll appear here on your profile.</p>
               </div>
             )}
           </div>

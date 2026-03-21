@@ -33,21 +33,22 @@ function App() {
   ]);
 
   return (
-   <div className="bg-gray-200">
+   <div className="min-h-screen bg-slate-50">
         <AuthProvider >
       <RouterProvider router={router} />
       <ToastContainer
         position="top-right"
-        autoClose={5000}
+        autoClose={3000}
         hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick={false}
+        newestOnTop
+        closeOnClick
         rtl={false}
         pauseOnFocusLoss
         draggable
         pauseOnHover
         theme="colored"
         transition={Bounce}
+        toastClassName="!rounded-2xl !shadow-xl !font-medium !text-sm"
       />
     </AuthProvider>
    </div>

@@ -24,7 +24,6 @@ export default function Addcomment({ id }) {
         `https://route-posts.routemisr.com/posts/${id}/comments`,
         {
           content: values.content,
-          
         },
         { headers:{
           Authorization: `Bearer ${token}`
@@ -43,7 +42,6 @@ export default function Addcomment({ id }) {
       }
     } catch (error) {
       console.error(error)
-      
     }
   }
 
@@ -57,12 +55,12 @@ export default function Addcomment({ id }) {
 
   return (
     <>
-      <div className="px-5 py-3 bg-white rounded-2xl mt-2.5 relative ">
-        <form onSubmit={formik.handleSubmit}>
+      <div className="px-4 md:px-5 py-3 bg-white rounded-2xl md:rounded-3xl mt-3 relative border border-slate-100/80 shadow-sm animate-fade-in-up">
+        <form onSubmit={formik.handleSubmit} className="flex items-center gap-3">
           <input
             type="text"
-            placeholder="Add Comment"
-            className=" rounded-2xl bg-gray-300 w-full px-2 py-3.5  "
+            placeholder="Write a comment..."
+            className="flex-1 rounded-2xl bg-slate-50 border border-slate-100 w-full px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-indigo-200 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all duration-200 outline-none"
             value={formik.values.content}
             onChange={formik.handleChange}
             onBlur={formik.handleBlur}
@@ -72,11 +70,11 @@ export default function Addcomment({ id }) {
           <button
             type="submit"
             disabled={formik.isSubmitting}
-            className=" disabled:bg-black bg-blue-600 p-2.5 rounded-2xl text-white hover:bg-blue-700 transition-colors absolute top-4 right-6"
+            className="w-10 h-10 flex-shrink-0 flex items-center justify-center disabled:opacity-40 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 rounded-xl text-white shadow-lg shadow-indigo-200 transition-all duration-200 active:scale-90 cursor-pointer"
           >
             <FontAwesomeIcon
               icon={faPaperPlane}
-              className="group-hover:rotate-12 transition-transform"
+              className="text-sm"
             />
           </button>
         </form>

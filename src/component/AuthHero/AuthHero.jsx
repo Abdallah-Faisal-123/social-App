@@ -14,92 +14,96 @@ export default function AuthHero() {
         backgroundPosition: 'center',
       }}
     >
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-indigo-900/60 to-purple-900/70 backdrop-blur-sm"></div>
 
       <div className="relative z-10 w-full max-w-6xl">
-        <p className="pt-8 pl-4 text-white text-2xl md:text-3xl font-semibold">
-          <span className="backdrop-blur-xl py-2 px-5 rounded-2xl">S</span> SocialHup
+        <p className="pt-8 pl-4 text-white text-2xl md:text-3xl font-bold flex items-center gap-3">
+          <span className="bg-white/10 backdrop-blur-xl py-2.5 px-4 rounded-2xl border border-white/10 text-indigo-300 font-black">S</span>
+          <span className="bg-gradient-to-r from-white to-indigo-200 bg-clip-text text-transparent">SocialHup</span>
         </p>
 
-        <div className="p-4 md:p-5">
-          <h1 className="text-3xl md:text-5xl font-bold text-white">Connect With</h1>
+        <div className="p-4 md:p-5 mt-4">
+          <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold text-white tracking-tight">Connect With</h1>
 
-          <h2 className="text-3xl md:text-5xl py-2 font-bold bg-linear-to-r from-cyan-200 to-black bg-clip-text text-transparent">
+          <h2 className="text-3xl md:text-5xl lg:text-6xl py-2 font-extrabold bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent animate-gradient">
             amazing people
           </h2>
 
-          <p className="max-w-lg text-white py-2 text-base md:text-lg">
+          <p className="max-w-lg text-white/70 py-3 text-base md:text-lg leading-relaxed">
             Join millions of users sharing moments, ideas, and building meaningful connections every day.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 my-10">
-            <div className="relative w-full p-5 rounded-xl backdrop-blur-2xl bg-white/20">
-              <span className="bg-cyan-300/50 rounded-xl p-3">
-                <FontAwesomeIcon icon={faMessage} className="text-cyan-500" />
+          {/* Feature Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-8 md:my-10">
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.07] backdrop-blur-xl border border-white/10 hover:bg-white/[0.12] transition-all duration-300 group cursor-default">
+              <span className="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-400/20 to-cyan-500/20 flex items-center justify-center">
+                <FontAwesomeIcon icon={faMessage} className="text-cyan-400 text-lg" />
               </span>
-              <div className="absolute text-white/70 left-20 top-1">
-                <h4 className="text-lg md:text-xl">Real-time chat</h4>
-                <span>Instant Messages</span>
+              <div>
+                <h4 className="text-white font-semibold text-sm md:text-base">Real-time chat</h4>
+                <span className="text-white/50 text-xs md:text-sm">Instant Messages</span>
               </div>
             </div>
 
-            <div className="relative w-full p-5 rounded-xl backdrop-blur-2xl bg-white/20">
-              <span className="bg-blue-400/50 rounded-xl p-3">
-                <FontAwesomeIcon icon={faImage} className="text-blue-600" />
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.07] backdrop-blur-xl border border-white/10 hover:bg-white/[0.12] transition-all duration-300 group cursor-default">
+              <span className="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-blue-400/20 to-indigo-500/20 flex items-center justify-center">
+                <FontAwesomeIcon icon={faImage} className="text-blue-400 text-lg" />
               </span>
-              <div className="absolute text-white/70 left-20 top-1">
-                <h4 className="text-lg md:text-xl">Share Media</h4>
-                <span>Photos and Videos</span>
+              <div>
+                <h4 className="text-white font-semibold text-sm md:text-base">Share Media</h4>
+                <span className="text-white/50 text-xs md:text-sm">Photos and Videos</span>
               </div>
             </div>
 
-            <div className="relative w-full p-5 rounded-xl backdrop-blur-2xl bg-white/20">
-              <span className="bg-purple-500/50 rounded-xl p-3">
-                <FontAwesomeIcon icon={faBell} className="text-purple-700" />
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.07] backdrop-blur-xl border border-white/10 hover:bg-white/[0.12] transition-all duration-300 group cursor-default">
+              <span className="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-purple-400/20 to-violet-500/20 flex items-center justify-center">
+                <FontAwesomeIcon icon={faBell} className="text-purple-400 text-lg" />
               </span>
-              <div className="absolute text-white/70 left-20 top-1">
-                <h4 className="text-lg md:text-xl">Smart Alerts</h4>
-                <span>Stay updated</span>
+              <div>
+                <h4 className="text-white font-semibold text-sm md:text-base">Smart Alerts</h4>
+                <span className="text-white/50 text-xs md:text-sm">Stay updated</span>
               </div>
             </div>
 
-            <div className="relative w-full p-5 rounded-xl backdrop-blur-2xl bg-white/20">
-              <span className="bg-green-300/40 rounded-xl p-3">
-                <FontAwesomeIcon icon={faMessage} className="text-green-400" />
+            <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.07] backdrop-blur-xl border border-white/10 hover:bg-white/[0.12] transition-all duration-300 group cursor-default">
+              <span className="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-400/20 to-green-500/20 flex items-center justify-center">
+                <FontAwesomeIcon icon={faUsers} className="text-emerald-400 text-lg" />
               </span>
-              <div className="absolute text-white/70 left-20 top-1">
-                <h4 className="text-lg md:text-xl">Communities</h4>
-                <span>Find your tribe</span>
+              <div>
+                <h4 className="text-white font-semibold text-sm md:text-base">Communities</h4>
+                <span className="text-white/50 text-xs md:text-sm">Find your tribe</span>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10 text-white">
-            <div>
-              <p className="text-xl md:text-2xl font-bold">
-                <FontAwesomeIcon icon={faUsers} className="text-blue-400" /> 2M+
+          {/* Stats */}
+          <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12 text-white">
+            <div className="text-center md:text-left">
+              <p className="text-2xl md:text-3xl font-extrabold flex items-center gap-2">
+                <FontAwesomeIcon icon={faUsers} className="text-indigo-400 text-xl" /> 2M+
               </p>
-              <span>Active Users</span>
+              <span className="text-white/50 text-sm font-medium">Active Users</span>
             </div>
 
-            <div>
-              <p className="text-xl md:text-2xl font-bold">
-                <FontAwesomeIcon icon={faHeart} className="text-red-400" /> 10M+
+            <div className="text-center md:text-left">
+              <p className="text-2xl md:text-3xl font-extrabold flex items-center gap-2">
+                <FontAwesomeIcon icon={faHeart} className="text-rose-400 text-xl" /> 10M+
               </p>
-              <span>Posts Shared</span>
+              <span className="text-white/50 text-sm font-medium">Posts Shared</span>
             </div>
 
-            <div>
-              <p className="text-xl md:text-2xl font-bold">
-                <FontAwesomeIcon icon={faMessage} className="text-blue-500" /> 50M+
+            <div className="text-center md:text-left">
+              <p className="text-2xl md:text-3xl font-extrabold flex items-center gap-2">
+                <FontAwesomeIcon icon={faMessage} className="text-cyan-400 text-xl" /> 50M+
               </p>
-              <span>Messages Sent</span>
+              <span className="text-white/50 text-sm font-medium">Messages Sent</span>
             </div>
           </div>
         </div>
 
-        <div className="mx-auto text-start mt-10 p-6 max-w-md backdrop-blur-2xl rounded-2xl ">
-          <div className="text-yellow-500">
+        {/* Testimonial */}
+        <div className="mx-auto text-start mt-8 md:mt-10 p-6 max-w-md bg-white/[0.07] backdrop-blur-2xl rounded-2xl border border-white/10">
+          <div className="text-amber-400 flex gap-1">
             <FontAwesomeIcon icon={faStar} />
             <FontAwesomeIcon icon={faStar} />
             <FontAwesomeIcon icon={faStar} />
@@ -107,15 +111,15 @@ export default function AuthHero() {
             <FontAwesomeIcon icon={faStar} />
           </div>
 
-          <p className="py-4 text-white text-start  md:text-base">
-            Lorem ipsum dolor sit amet consectetur adipisicing elit. Corrupti nemo corporis, veniam quisquam eaque repudiandae?
+          <p className="py-4 text-white/70 text-start text-sm md:text-base leading-relaxed">
+            "SocialHup has transformed how I connect with friends and colleagues. The interface is beautiful and incredibly intuitive!"
           </p>
 
-          <div className="flex items-center  gap-4 text-white">
-            <img src={avatar} className="w-12 h-12 rounded-full" alt="" />
+          <div className="flex items-center gap-4 text-white">
+            <img src={avatar} className="w-11 h-11 rounded-xl object-cover ring-2 ring-white/10" alt="" />
             <div className="text-left">
-              <p className="font-bold">Abdallah Faisal</p>
-              <span className="text-sm">Web Developer</span>
+              <p className="font-bold text-sm">Abdallah Faisal</p>
+              <span className="text-xs text-white/50">Web Developer</span>
             </div>
           </div>
         </div>

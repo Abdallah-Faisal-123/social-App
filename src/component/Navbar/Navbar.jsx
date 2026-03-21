@@ -10,59 +10,87 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="shadow bg-white sticky top-0 z-50">
-        <div className="container mx-auto py-3 px-4 flex items-center justify-between">
+      <nav className="sticky top-0 z-50 glass border-b border-white/10 shadow-sm">
+        <div className="container mx-auto py-3 px-4 sm:px-6 flex items-center justify-between">
 
           <h1 className="flex-shrink-0">
-            <Link to="/" className="text-xl md:text-2xl lg:text-3xl font-bold flex items-center gap-1 md:gap-2">
-              <FontAwesomeIcon icon={faSquareShareNodes} className="text-blue-600 text-2xl md:text-3xl lg:text-4xl" />
-              <span className="hidden sm:inline">SocialHup</span>
-              <span className="sm:hidden">SocialHup</span>
+            <Link to="/" className="text-xl md:text-2xl font-extrabold flex items-center gap-2 group">
+              <span className="relative">
+                <span className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl blur-sm opacity-60 group-hover:opacity-80 transition-opacity"></span>
+                <FontAwesomeIcon icon={faSquareShareNodes} className="relative text-white text-xl md:text-2xl bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl" />
+              </span>
+              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent tracking-tight">SocialHup</span>
             </Link>
           </h1>
 
           {/* Desktop Navigation */}
-          <ul className="hidden md:flex ms-auto px-3">
-            <li className="mx-2"><NavLink to="/" className={({ isActive }) => `${isActive && "text-blue-600"} font-semibold hover:text-blue-600 transition`}>Home</NavLink></li>
-            <li className="mx-2"><NavLink to="/profile" className={({ isActive }) => `${isActive && "text-blue-600"} font-semibold hover:text-blue-600 transition`}>Profile</NavLink></li>
-            <li className="mx-2"><NavLink to="/settings" className={({ isActive }) => `${isActive && "text-blue-600"} font-semibold hover:text-blue-600 transition`}>Settings</NavLink></li>
+          <ul className="hidden md:flex items-center gap-1 ms-auto px-3">
+            <li>
+              <NavLink to="/" className={({ isActive }) => `px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'}`}>
+                Home
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/chat" className={({ isActive }) => `px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'}`}>
+                Chat
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/profile" className={({ isActive }) => `px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'}`}>
+                Profile
+              </NavLink>
+            </li>
+            <li>
+              <NavLink to="/settings" className={({ isActive }) => `px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'}`}>
+                Settings
+              </NavLink>
+            </li>
           </ul>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Notification Bell */}
-            <span className="text-lg text-gray-600 relative cursor-pointer hover:text-blue-600 transition">
-              <FontAwesomeIcon icon={faBell} className="p-1" />
-              <span className="w-2 h-2 bg-red-600 rounded-full absolute top-0 right-0"></span>
-            </span>
+            <button className="relative w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200">
+              <FontAwesomeIcon icon={faBell} className="text-lg" />
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full ring-2 ring-white animate-pulse"></span>
+            </button>
 
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden text-2xl text-gray-700 hover:text-blue-600 transition p-2"
+              className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200"
               aria-label="Toggle menu"
             >
-              <FontAwesomeIcon icon={isMobileMenuOpen ? faXmark : faBars} />
+              <FontAwesomeIcon icon={isMobileMenuOpen ? faXmark : faBars} className="text-lg" />
             </button>
           </div>
         </div>
 
         {/* Mobile Menu */}
-        <div className={`md:hidden transition-all duration-300 ease-in-out overflow-hidden ${isMobileMenuOpen ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0'}`}>
-          <ul className="flex flex-col bg-gray-50 border-t border-gray-200">
-            <li className="border-b border-gray-200">
+        <div className={`md:hidden transition-all duration-300 ease-in-out overflow-hidden ${isMobileMenuOpen ? 'max-h-72 opacity-100' : 'max-h-0 opacity-0'}`}>
+          <ul className="flex flex-col p-3 pt-0 space-y-1">
+            <li>
               <NavLink
                 to="/"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={({ isActive }) => `${isActive && "text-blue-600 bg-blue-50"} font-semibold hover:bg-gray-100 transition block px-6 py-4`}
+                className={({ isActive }) => `${isActive ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-slate-600 hover:bg-slate-50'} font-semibold transition-all duration-200 block px-4 py-3 rounded-xl`}
               >
                 Home
               </NavLink>
             </li>
-            <li className="border-b border-gray-200">
+            <li>
+              <NavLink
+                to="/chat"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={({ isActive }) => `${isActive ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-slate-600 hover:bg-slate-50'} font-semibold transition-all duration-200 block px-4 py-3 rounded-xl`}
+              >
+                Chat
+              </NavLink>
+            </li>
+            <li>
               <NavLink
                 to="/profile"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={({ isActive }) => `${isActive && "text-blue-600 bg-blue-50"} font-semibold hover:bg-gray-100 transition block px-6 py-4`}
+                className={({ isActive }) => `${isActive ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-slate-600 hover:bg-slate-50'} font-semibold transition-all duration-200 block px-4 py-3 rounded-xl`}
               >
                 Profile
               </NavLink>
@@ -71,7 +99,7 @@ export default function Navbar() {
               <NavLink
                 to="/settings"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={({ isActive }) => `${isActive && "text-blue-600 bg-blue-50"} font-semibold hover:bg-gray-100 transition block px-6 py-4`}
+                className={({ isActive }) => `${isActive ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-slate-600 hover:bg-slate-50'} font-semibold transition-all duration-200 block px-4 py-3 rounded-xl`}
               >
                 Settings
               </NavLink>

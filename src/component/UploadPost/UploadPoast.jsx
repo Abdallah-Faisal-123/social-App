@@ -9,7 +9,6 @@ import axios from "axios"
 import { toast } from "react-toastify"
 import { faXmark } from "@fortawesome/free-solid-svg-icons"
 
-
 export default function UploadPoast() {
   const [preview, setPreview] = useState(null)
   const { token } = useContext(AuthContext)
@@ -34,9 +33,9 @@ export default function UploadPoast() {
         return supportedTypes.includes(file.type);
       }),
   });
+
   async function handleSubmit(values) {
     try {
-
       const formData = new FormData()
       formData.append('body', values.body);
       if (values.image) {
@@ -54,20 +53,18 @@ export default function UploadPoast() {
       const { data } = await axios.request(options);
 
       if (data.success === true) {
-
         toast.success("Post created successfully")
         formik.resetForm()
         setPreview(null)
-        
         setTimeout(()=>{
           window.location.reload()
         },5000)
       }
-
     } catch (error) {
       toast.error("failed to create a post")
     }
   }
+
   const formik = useFormik({
     initialValues: {
       body: '',
@@ -77,59 +74,53 @@ export default function UploadPoast() {
     validationSchema: validationSchema
   })
 
-
   async function getProfileData() {
     try {
       const options = {
         url: `https://route-posts.routemisr.com/users/profile-data`,
         method: 'GET',
-          headers:{
+        headers:{
           Authorization: `Bearer ${token}`
         }
       }
-
       const { data } = await axios.request(options)
-      console.log("Profile Data API Response:", data)
-
       if (data.data.user) {
         setUserPhoto(data.data.user.photo)
-        
-
-      }
-      else {
-        console.log("error")
       }
     } catch (error) {
       console.error("Error fetching profile data:", error)
-
-
     }
   }
   useEffect(() => { getProfileData() }, [])
+
   return (
     <>
-      <div className="pt-3 md:pt-5 px-2 sm:px-0">
-
-        <div className="container bg-white rounded-xl md:rounded-2xl mx-auto max-w-full sm:max-w-xl shadow-lg md:shadow-2xl">
-          <header className="p-2 md:p-2.5">
-            <div className="flex">
-              <img src={userphoto} alt="" className="size-10 md:size-12 rounded-full" />
-              <div className="ms-2">
-                <p className="font-semibold text-base md:text-lg">Create a Post</p>
-                <span className="text-xs md:text-sm text-gray-600">Share your thoughts with the world</span>
+      <div className="pt-4 md:pt-6 px-2 sm:px-0">
+        <div className="container bg-white rounded-2xl md:rounded-3xl mx-auto max-w-full sm:max-w-xl border border-slate-100/80 shadow-sm hover:shadow-md transition-shadow duration-300 animate-fade-in-up">
+          
+          {/* Header */}
+          <header className="p-4 md:p-5">
+            <div className="flex items-center">
+              <div className="relative">
+                <img src={userphoto} alt="" className="size-11 md:size-12 rounded-2xl object-cover ring-2 ring-slate-100" />
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full ring-2 ring-white"></div>
+              </div>
+              <div className="ms-3">
+                <p className="font-bold text-sm md:text-base text-slate-800">Create a Post</p>
+                <span className="text-xs text-slate-400 font-medium">Share your thoughts with the world</span>
               </div>
             </div>
-
-            <div className=""></div>
           </header>
+
+          {/* Form */}
           <form onSubmit={formik.handleSubmit}>
-            <div className="px-3 md:px-5">
+            <div className="px-4 md:px-5">
               <FormField
                 elementType={'texterea'}
                 name="body"
                 id="body"
-                placeholder={`Whats on your mind?`}
-                className={"w-full bg-gray-200 rounded px-3 md:px-5 py-2 md:py-3 text-sm md:text-base"}
+                placeholder={`What's on your mind?`}
+                className={"w-full bg-slate-50 rounded-2xl px-4 md:px-5 py-3 md:py-4 text-sm md:text-[15px] border border-slate-100 focus:border-indigo-200 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all duration-200 outline-none resize-none min-h-[80px] text-slate-700 placeholder:text-slate-400"}
                 value={formik.values.body}
                 onChange={formik.handleChange}
                 onBlur={formik.handleBlur}
@@ -137,29 +128,28 @@ export default function UploadPoast() {
                 touched={formik.touched.body}
               />
             </div>
+
+            {/* Image Preview */}
             {preview && (
-              <div className="p-3 md:p-5 relative">
-                <img src={preview} alt="" className="w-full aspect-video object-cover rounded-xl md:rounded-2xl" />
+              <div className="p-4 md:p-5 relative">
+                <img src={preview} alt="" className="w-full aspect-video object-cover rounded-2xl" />
                 <button type="button" onClick={() => {
                   setPreview(null)
                   formik.setFieldValue('image', null)
-                }} className="size-6 md:size-7 rounded-full flex justify-center items-center bg-red-500 hover:bg-red-600 transition-colors duration-100 text-white absolute top-5 md:top-7 right-5 md:right-7 cursor-pointer">
-                  <FontAwesomeIcon icon={faXmark} />
+                }} className="size-7 md:size-8 rounded-full flex justify-center items-center bg-slate-800/60 hover:bg-red-500 backdrop-blur-sm transition-colors duration-200 text-white absolute top-6 md:top-7 right-6 md:right-7 cursor-pointer">
+                  <FontAwesomeIcon icon={faXmark} className="text-sm" />
                 </button>
               </div>
             )}
 
-
-            <div className="py-3 md:py-5 px-3 md:px-5 flex justify-between items-center">
-              <button type="button" className="bg-gray-100 rounded p-1.5 md:p-2">
-                <label htmlFor="image" className="cursor-pointer">
-                  <div className="-mb-3 md:-mb-4">
-                    <FontAwesomeIcon icon={faImage} className="text-gray-500 text-lg md:text-xl pe-1" />
-                    <span className="text-sm md:text-base">Photo</span>
-                  </div>
+            {/* Footer Actions */}
+            <div className="py-3 md:py-4 px-4 md:px-5 flex justify-between items-center border-t border-slate-50">
+              <button type="button" className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-indigo-50 transition-colors duration-200 group cursor-pointer">
+                <label htmlFor="image" className="cursor-pointer flex items-center gap-2">
+                  <FontAwesomeIcon icon={faImage} className="text-slate-400 group-hover:text-indigo-500 text-lg transition-colors" />
+                  <span className="text-sm font-semibold text-slate-500 group-hover:text-indigo-600 transition-colors">Photo</span>
                 </label>
                 <FormField
-
                   elementType={'file'}
                   type={'file'}
                   id={'image'}
@@ -178,7 +168,7 @@ export default function UploadPoast() {
               <button
                 type="submit"
                 disabled={formik.isSubmitting}
-                className="text-white text-sm md:text-base rounded cursor-pointer disabled:cursor-not-allowed bg-gradient-to-r from-blue-600 to-cyan-400 px-3 md:px-4 py-1.5 md:py-2"
+                className="text-white text-sm font-semibold rounded-xl cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 px-5 md:px-6 py-2.5 shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all duration-200 active:scale-95"
               >
                 {formik.isSubmitting ? "Posting..." : "Post"}
               </button>

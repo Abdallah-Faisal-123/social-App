@@ -19,6 +19,7 @@ export const sendMessage   = async (recipientId, text, senderId, imageUrl = null
             text: text || "",
             img: imageUrl || null,
             createdAt: serverTimestamp(),
+            read: false,
         });
 
         return true; 

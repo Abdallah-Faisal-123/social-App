@@ -1,14 +1,14 @@
 
 import Navbar from '../../component/Navbar/Navbar'
 import Feed from '../../component/Feed/Feed'
-import UploadPoast from '../../component/UploadPost/UploadPoast'
 
 export default function Home() {
   return (
-    <div className="min-h-screen ">
+    <div className="min-h-screen bg-slate-50">
       <Navbar />
-
-      <div><Feed /></div>
+      <div className="animate-fade-in-up">
+        <Feed />
+      </div>
     </div>
   )
 }
