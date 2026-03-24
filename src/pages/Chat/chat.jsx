@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext,useRef } from 'react';
+import React, { useEffect, useState, useContext, useRef, useCallback } from 'react';
 import { getCurrentUser } from "../../utils/getUser";
 import { useChatMessages } from "../../utils/useChatMessages";
 import { sendMessage } from "../../utils/sendMessage";
@@ -14,16 +14,110 @@ import {
     faVideo,
     faChevronLeft,
     faMicrophone,
+    faMicrophoneSlash,
     faPlus,
     faArrowAltCircleLeft,
     faCheck,
-    faCheckDouble
+    faCheckDouble,
+    faPlay,
+    faPause,
+    faStop,
+    faTrash,
+    faReply,
+    faTimes,
+    faPaperclip,
+    faFileAlt
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
-import { collection, query, orderBy, limit, getDocs, doc, setDoc, updateDoc, serverTimestamp, onSnapshot, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, getDoc, writeBatch } from 'firebase/firestore';
 
 import { saveContact } from '../../utils/useSaveContact';
 import { db } from './firebase';
+
+// ── Custom Voice Message Player Component ──
+function VoiceMessagePlayer({ src, isMine }) {
+    const audioRef = useRef(null);
+    const [playing, setPlaying] = useState(false);
+    const [duration, setDuration] = useState(0);
+    const [currentTime, setCurrentTime] = useState(0);
+
+    useEffect(() => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        const onLoaded = () => setDuration(audio.duration || 0);
+        const onTimeUpdate = () => setCurrentTime(audio.currentTime || 0);
+        const onEnded = () => { setPlaying(false); setCurrentTime(0); };
+        audio.addEventListener('loadedmetadata', onLoaded);
+        audio.addEventListener('timeupdate', onTimeUpdate);
+        audio.addEventListener('ended', onEnded);
+        return () => {
+            audio.removeEventListener('loadedmetadata', onLoaded);
+            audio.removeEventListener('timeupdate', onTimeUpdate);
+            audio.removeEventListener('ended', onEnded);
+        };
+    }, [src]);
+
+    const togglePlay = () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        if (playing) { audio.pause(); } else { audio.play(); }
+        setPlaying(!playing);
+    };
+
+    const formatTime = (t) => {
+        if (!t || isNaN(t)) return '0:00';
+        const m = Math.floor(t / 60);
+        const s = Math.floor(t % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    };
+
+    const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+    // Generate fixed waveform bars (seeded from src length for variety)
+    const barCount = 28;
+    const bars = useRef(
+        Array.from({ length: barCount }, (_, i) => {
+            const seed = ((i + 1) * 7 + (src?.length || 0)) % 100;
+            return 20 + (seed % 80); // height 20-100%
+        })
+    ).current;
+
+    return (
+        <div className="flex items-center gap-2.5 py-1" style={{ minWidth: 220 }}>
+            <audio ref={audioRef} src={src} preload="metadata" />
+            <button
+                onClick={togglePlay}
+                className={`w-10 h-10 rounded-full border-none flex items-center justify-center text-sm cursor-pointer shrink-0 transition-all duration-150 ease-out active:scale-90 ${
+                    isMine ? 'bg-white/25 text-white backdrop-blur-sm hover:bg-white/35 hover:shadow-[0_2px_12px_rgba(255,255,255,0.15)]' : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-[0_2px_12px_rgba(59,130,246,0.3)]'
+                }`}
+                aria-label={playing ? 'Pause' : 'Play'}
+            >
+                <FontAwesomeIcon icon={playing ? faPause : faPlay} style={playing ? {} : { marginLeft: 2 }} />
+            </button>
+
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-0.5 h-8">
+                    {bars.map((h, i) => {
+                        const barPos = (i / barCount) * 100;
+                        const active = barPos < progress;
+                        return (
+                            <span
+                                key={i}
+                                className={`w-[3px] rounded-full transition-all duration-150 ease-out shrink-0 ${active ? (isMine ? 'bg-white/90' : 'bg-blue-500') : (isMine ? 'bg-white/30' : 'bg-gray-300')} ${playing && active ? 'animate-[bar-bounce_0.5s_ease-in-out_infinite]' : ''}`}
+                                style={{ height: `${h}%` }}
+                            />
+                        );
+                    })}
+                </div>
+                <div className="flex justify-start mt-0.5">
+                    <span className={`text-[11px] font-semibold tabular-nums ${isMine ? 'text-white/65' : 'text-gray-400'}`}>
+                        {playing || currentTime > 0 ? formatTime(currentTime) : formatTime(duration)}
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export default function Chat() {
     const [lastUsers, setLastUsers] = useState([]);
@@ -34,8 +128,23 @@ export default function Chat() {
         const scrollRef = useRef(null);
         const [uploading, setUploading] = useState(false);     
         const [isRecording, setIsRecording] = useState(false);
+        const [recordingTime, setRecordingTime] = useState(0);
+        const recordingTimerRef = useRef(null);
         const mediaRecorderRef = useRef(null);
         const audioChunksRef = useRef([]);
+        // Reply state
+        const [replyingTo, setReplyingTo] = useState(null);
+        // Delete menu state
+        const [deleteMenuMsg, setDeleteMenuMsg] = useState(null);
+        const [deleteMenuPos, setDeleteMenuPos] = useState({ x: 0, y: 0 });
+        const deleteMenuRef = useRef(null);
+        const longPressTimerRef = useRef(null);
+        const mainSwipeStartX = useRef(null);
+        const [hiddenMsgIds, setHiddenMsgIds] = useState(() => {
+            try { return JSON.parse(localStorage.getItem('hiddenMsgIds') || '[]'); } catch { return []; }
+        });
+        // Contact delete state
+        const [contactToDelete, setContactToDelete] = useState(null);
         // تعديل تعريف الـ State في بداية الكومبوننت
 const [moreFrnds, setMoreFrnds] = useState(() => {
     const savedPage = localStorage.getItem("lastPaginationPage");
@@ -277,7 +386,8 @@ useEffect(() => {
 const handleSend = async () => {
     // ... كود التحقق (Validation)
     try {
-        await sendMessage(selectedUser._id, text, currentUser.id);
+        await sendMessage(selectedUser._id, text, currentUser.id, null, null, replyingTo);
+        setReplyingTo(null);
         
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
@@ -301,27 +411,43 @@ const handleSend = async () => {
 
 
 
-const handleImageUpload = async (e) => {
+const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", "images"); // حط الـ Preset بتاعك هنا
+    formData.append("upload_preset", "images");
 
     setUploading(true);
     try {
         const res = await axios.post(
-            "https://api.cloudinary.com/v1_1/dvzdfcwfa/image/upload", // حط الـ Cloud Name هنا
+            "https://api.cloudinary.com/v1_1/dvzdfcwfa/auto/upload",
             formData
         );
         const downloadURL = res.data.secure_url;
 
-        // ابعت الرابط لـ Firebase (الرسائل) زي ما إحنا
-        await sendMessage(selectedUser._id, "", currentUser.id, downloadURL);
+        let imgUrl = null, audioUrl = null, videoUrl = null, fileUrl = null;
+        let msgTypeStr = "File 📎";
+
+        if (file.type.startsWith('image/')) {
+            imgUrl = downloadURL;
+            msgTypeStr = "Photo 📷";
+        } else if (file.type.startsWith('audio/')) {
+            audioUrl = downloadURL;
+            msgTypeStr = "Audio 🎵";
+        } else if (file.type.startsWith('video/')) {
+            videoUrl = downloadURL;
+            msgTypeStr = "Video 🎥";
+        } else {
+            fileUrl = downloadURL;
+        }
+
+        await sendMessage(selectedUser._id, "", currentUser.id, imgUrl, audioUrl, replyingTo, videoUrl, fileUrl);
+        setReplyingTo(null);
         
         setLastUsers(prev => prev.map(u => 
-            u._id === selectedUser._id ? { ...u, lastMsg: "Photo 📷" } : u
+            u._id === selectedUser._id ? { ...u, lastMsg: msgTypeStr } : u
         ));
     } catch (err) {
         console.error("Cloudinary Error:", err);
@@ -353,6 +479,10 @@ const startRecording = async () => {
 
         mediaRecorder.start();
         setIsRecording(true);
+        setRecordingTime(0);
+        recordingTimerRef.current = setInterval(() => {
+            setRecordingTime(prev => prev + 1);
+        }, 1000);
     } catch (err) {
         console.error("Microphone access error:", err);
         alert("Could not access microphone. Please check permissions!");
@@ -363,7 +493,27 @@ const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
         mediaRecorderRef.current.stop();
         setIsRecording(false);
+        clearInterval(recordingTimerRef.current);
+        setRecordingTime(0);
     }
+};
+
+const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+        mediaRecorderRef.current.ondataavailable = null;
+        mediaRecorderRef.current.onstop = null;
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+        setIsRecording(false);
+        clearInterval(recordingTimerRef.current);
+        setRecordingTime(0);
+    }
+};
+
+const formatRecTime = (s) => {
+    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    const sec = (s % 60).toString().padStart(2, '0');
+    return `${m}:${sec}`;
 };
 
 const uploadAudioFile = async (file) => {
@@ -381,7 +531,8 @@ const uploadAudioFile = async (file) => {
         );
         const downloadURL = res.data.secure_url;
 
-        await sendMessage(selectedUser._id, "", currentUser.id, null, downloadURL);
+        await sendMessage(selectedUser._id, "", currentUser.id, null, downloadURL, replyingTo);
+        setReplyingTo(null);
         
         setLastUsers(prev => prev.map(u => 
             u._id === selectedUser._id ? { ...u, lastMsg: "Voice message 🎤" } : u
@@ -391,7 +542,146 @@ const uploadAudioFile = async (file) => {
     } finally {
         setUploading(false);
     }
-};   return (
+};
+
+// ── Close delete menu on outside click ──
+useEffect(() => {
+    const handleClickOutside = (e) => {
+        if (deleteMenuRef.current && !deleteMenuRef.current.contains(e.target)) {
+            setDeleteMenuMsg(null);
+        }
+    };
+    if (deleteMenuMsg) {
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+    }
+    return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('touchstart', handleClickOutside);
+    };
+}, [deleteMenuMsg]);
+
+// ── Open delete context menu ──
+const openDeleteMenu = (e, message) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const isMine = message.senderId === currentUser?.id;
+    setDeleteMenuPos({
+        x: isMine ? rect.left : rect.right - 200,
+        y: rect.top - 10
+    });
+    setDeleteMenuMsg(message);
+};
+
+// Long press handlers for mobile
+const handleTouchStart = (e, message) => {
+    longPressTimerRef.current = setTimeout(() => {
+        const touch = e.touches[0];
+        const fakeEvent = { preventDefault: () => {}, stopPropagation: () => {}, currentTarget: e.currentTarget, clientX: touch.clientX, clientY: touch.clientY };
+        // Use touch position directly
+        setDeleteMenuPos({ x: touch.clientX - 100, y: touch.clientY - 80 });
+        setDeleteMenuMsg(message);
+    }, 500);
+};
+
+const handleTouchEnd = () => {
+    clearTimeout(longPressTimerRef.current);
+};
+
+// ── Main Chat Swipe Handlers ──
+const handleMainTouchStart = (e) => {
+    // Only register one touch to avoid pinch gestures
+    if (e.touches.length === 1) {
+        mainSwipeStartX.current = e.touches[0].clientX;
+    }
+};
+
+const handleMainTouchEnd = (e) => {
+    if (mainSwipeStartX.current === null) return;
+    const endX = e.changedTouches[0].clientX;
+    const diffX = endX - mainSwipeStartX.current;
+    
+    // Swipe Right -> Open Sidebar (like swiping back)
+    // You only want this active on mobile views (< 1024)
+    if (diffX > 75 && window.innerWidth < 1024) {
+        setMobileSidebarOpen(true);
+    }
+    
+    mainSwipeStartX.current = null;
+};
+
+// ── Delete for everyone (removes from Firebase) ──
+const deleteForEveryone = async (message) => {
+    if (!chatId || !message?.id) return;
+    try {
+        const msgRef = doc(db, 'chats', chatId, 'messages', message.id);
+        await deleteDoc(msgRef);
+        setDeleteMenuMsg(null);
+    } catch (err) {
+        console.error('Delete for everyone failed:', err);
+    }
+};
+
+// ── Delete for me (hides locally) ──
+const deleteForMe = (message) => {
+    if (!message?.id) return;
+    const updated = [...hiddenMsgIds, message.id];
+    setHiddenMsgIds(updated);
+    localStorage.setItem('hiddenMsgIds', JSON.stringify(updated));
+    setDeleteMenuMsg(null);
+};
+
+// Filter hidden messages
+const visibleMessages = messages.filter(m => !hiddenMsgIds.includes(m.id));
+
+// ── Handle reply ──
+const handleReply = (message) => {
+    setReplyingTo({
+        id: message.id,
+        text: message.text || (message.img ? 'Photo 📷' : (message.audio ? 'Voice message 🎤' : 'Message')),
+        senderId: message.senderId,
+        senderName: message.senderId === currentUser?.id ? 'You' : selectedUser?.name
+    });
+    setDeleteMenuMsg(null);
+    // Auto focus the input after a short delay
+    setTimeout(() => {
+        const input = document.getElementById('chat-text-input');
+        if (input) input.focus();
+    }, 50);
+};
+
+// ── Delete contact ──
+const handleDeleteContact = async (user) => {
+    if (!user?._id || !currentUser?.id) return;
+    try {
+        const cId = [currentUser.id, user._id].sort().join("_");
+
+        // Delete all messages in the chat
+        const msgsRef = collection(db, "chats", cId, "messages");
+        const msgsSnap = await getDocs(msgsRef);
+        const batch = writeBatch(db);
+        msgsSnap.docs.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+
+        // Remove from local state
+        const updated = lastUsers.filter(u => u._id !== user._id);
+        setLastUsers(updated);
+        localStorage.setItem('savedUsers', JSON.stringify(updated));
+
+        // If this was the selected user, deselect
+        if (selectedUser?._id === user._id) {
+            setSelectedUser(null);
+            if (window.innerWidth < 1024) setMobileSidebarOpen(true);
+        }
+    } catch (err) {
+        console.error('Delete contact failed:', err);
+    } finally {
+        setContactToDelete(null);
+    }
+};
+
+   return (
         <div className="flex h-screen bg-white overflow-hidden font-['Inter',sans-serif]">
             {/* Sidebar - Modern List */}
             <aside
@@ -462,7 +752,7 @@ const uploadAudioFile = async (file) => {
                                         setSelectedUser(user);
                                         if (window.innerWidth < 1024) setMobileSidebarOpen(false);
                                     }}
-                                    className={`flex items-center p-4 rounded-2xl cursor-pointer transition-all duration-300 ${selectedUser?._id === user._id
+                                    className={`group/contact flex items-center p-4 rounded-2xl cursor-pointer transition-all duration-300 ${selectedUser?._id === user._id
                                         ? 'bg-blue-600 shadow-xl shadow-blue-100'
                                         : 'hover:bg-white hover:shadow-md'
                                         }`}
@@ -489,6 +779,22 @@ const uploadAudioFile = async (file) => {
                                             {user?.lastMsg}
                                         </p>
                                     </div>
+
+                                    {/* Delete contact button */}
+                                    <button
+                                        className={`w-8 h-8 rounded-full border-none bg-transparent flex items-center justify-center text-[13px] cursor-pointer transition-all duration-150 shrink-0 ml-2 ${
+                                            selectedUser?._id === user._id
+                                                ? 'opacity-100 text-white/50 hover:bg-white/15 hover:text-white'
+                                                : 'opacity-0 text-gray-300 group-hover/contact:opacity-100 hover:bg-red-500/10 hover:text-red-500 hover:scale-110'
+                                        }`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setContactToDelete(user);
+                                        }}
+                                        title="Delete contact"
+                                    >
+                                        <FontAwesomeIcon icon={faTrash} />
+                                    </button>
                                 </div>
                             ))
                         ) : (
@@ -521,8 +827,36 @@ const uploadAudioFile = async (file) => {
                 </div>
             </aside>
 
+            {/* ── Delete Contact Confirmation Modal ── */}
+            {contactToDelete && (
+                <div className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm flex items-center justify-center animate-[fade-in-up_0.25s_ease-out]" onClick={() => setContactToDelete(null)}>
+                    <div className="bg-white rounded-[20px] pt-7 px-6 pb-5 w-[340px] max-w-[90vw] shadow-[0_20px_60px_rgba(0,0,0,0.2)] text-center animate-[delete-menu-in_0.25s_cubic-bezier(0.16,1,0.3,1)]" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-center mb-4">
+                            <img src={contactToDelete?.photo || contactToDelete?.avatar} alt={contactToDelete?.name} className="w-14 h-14 rounded-full object-cover border-[3px] border-red-200 shadow-[0_4px_12px_rgba(239,68,68,0.15)]" />
+                        </div>
+                        <h3 className="text-[18px] font-bold text-gray-900 mb-2">Delete Chat</h3>
+                        <p className="text-[13.5px] text-gray-500 leading-relaxed mb-5">
+                            Delete conversation with <strong>{contactToDelete?.name}</strong>? All messages will be permanently removed.
+                        </p>
+                        <div className="flex gap-2.5">
+                            <button className="flex-1 py-[11px] rounded-xl border-none text-sm font-semibold cursor-pointer transition-all duration-150 active:scale-[0.97] bg-gray-100 text-gray-700 hover:bg-gray-200" onClick={() => setContactToDelete(null)}>
+                                Cancel
+                            </button>
+                            <button className="flex-1 py-[11px] rounded-xl border-none text-sm font-semibold cursor-pointer transition-all duration-150 active:scale-[0.97] bg-red-500 text-white shadow-[0_4px_12px_rgba(239,68,68,0.3)] hover:bg-red-600" onClick={() => handleDeleteContact(contactToDelete)}>
+                                <FontAwesomeIcon icon={faTrash} className="mr-2" />
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Main Chat Interface */}
-            <main className="flex-1 flex flex-col min-w-0 bg-white relative">
+            <main 
+                className="flex-1 flex flex-col min-w-0 bg-white relative"
+                onTouchStart={handleMainTouchStart}
+                onTouchEnd={handleMainTouchEnd}
+            >
                 {!selectedUser ? (
                     <div className="flex-1 flex flex-col items-center justify-center bg-gray-50/30 p-8 text-center animate-fade-in-up">
                         <div className="w-24 h-24 bg-blue-600/10 rounded-full flex items-center justify-center text-blue-600 text-4xl mb-6 shadow-inner">
@@ -585,25 +919,49 @@ const uploadAudioFile = async (file) => {
                                     <p className="text-xs">Send a message to start the conversation!</p>
                                 </div>
                             ) : (
-                                messages.map((message) => (
+                                visibleMessages.map((message) => (
                                     <div
                                         key={message.id}
-                                        className={`flex items-end space-x-3 group animate-fade-in-up ${message.senderId === currentUser?.id ? 'justify-end' : 'justify-start'}`}
+                                        className={`flex items-end space-x-3 group animate-fade-in-up msg-row ${message.senderId === currentUser?.id ? 'justify-end' : 'justify-start'}`}
                                     >
                                         {message.senderId !== currentUser?.id && (
                                             <img src={selectedUser?.photo || selectedUser?.avatar} className="w-8 h-8 rounded-lg shadow-sm" alt="Avatar" />
                                         )}
 
-                                        <div className={`max-w-[80%] sm:max-w-md ${message.senderId === currentUser?.id
-                                            ? 'bg-blue-600 text-white rounded-2xl rounded-br-none shadow-lg shadow-blue-100 hover:shadow-xl'
-                                            : 'bg-white border border-gray-100 text-gray-700 rounded-2xl rounded-bl-none shadow-sm hover:shadow-md'
-                                            } px-5 py-3 transition-shadow overflow-hidden`}
+                                        <div
+                                            className={`relative max-w-[80%] sm:max-w-md ${message.senderId === currentUser?.id
+                                                ? 'bg-blue-600 text-white rounded-2xl rounded-br-none shadow-lg shadow-blue-100 hover:shadow-xl'
+                                                : 'bg-white border border-gray-100 text-gray-700 rounded-2xl rounded-bl-none shadow-sm hover:shadow-md'
+                                                } px-5 py-3 transition-shadow overflow-hidden cursor-pointer flex flex-col`}
+                                            onContextMenu={(e) => openDeleteMenu(e, message)}
+                                            onTouchStart={(e) => handleTouchStart(e, message)}
+                                            onTouchEnd={handleTouchEnd}
+                                            onTouchMove={handleTouchEnd}
                                         >
+                                            {/* ── Reply Snippet Inside Bubble ── */}
+                                            {message.replyTo && (
+                                                <div className={`mb-2 pl-3 py-1.5 pr-3 rounded-lg border-l-4 text-xs ${message.senderId === currentUser?.id ? 'bg-blue-700/30 border-blue-200 text-blue-50' : 'bg-gray-100 border-blue-400 text-gray-500'}`}>
+                                                    <div className={`font-bold mb-0.5 ${message.senderId === currentUser?.id ? 'text-blue-100' : 'text-blue-600'}`}>
+                                                        {message.replyTo.senderName}
+                                                    </div>
+                                                    <div className="truncate opacity-90">{message.replyTo.text}</div>
+                                                </div>
+                                            )}
+
                                             {message.img && (
                                                 <img src={message.img} className="rounded-xl w-full h-auto mb-2" alt="Attachment" />
                                             )}
+                                            {message.video && (
+                                                <video src={message.video} controls className="rounded-xl w-full max-w-[280px] h-auto mb-2 border border-black/5" />
+                                            )}
+                                            {message.file && (
+                                                <a href={message.file} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 p-3 sm:px-4 sm:py-3 bg-black/5 hover:bg-black/10 rounded-xl mb-2 transition-colors cursor-pointer w-[200px] sm:w-[240px]">
+                                                    <FontAwesomeIcon icon={faFileAlt} className={`text-2xl shrink-0 opacity-80 ${message.senderId === currentUser?.id ? 'text-blue-100' : 'text-gray-500'}`} />
+                                                    <span className="text-sm font-semibold truncate flex-1 underline decoration-transparent hover:decoration-current transition">Attachment File</span>
+                                                </a>
+                                            )}
                                             {message.audio && (
-                                                <audio src={message.audio} controls className="mb-2 max-w-[200px] sm:max-w-xs h-10" />
+                                                <VoiceMessagePlayer src={message.audio} isMine={message.senderId === currentUser?.id} />
                                             )}
                                             {message.text && (
                                                 <p className="text-sm leading-relaxed font-medium">{message.text}</p>
@@ -624,56 +982,127 @@ const uploadAudioFile = async (file) => {
                                     </div>
                                 ))
                             )}
+
+                            {/* ── Context Menu ── */}
+                            {deleteMenuMsg && (
+                                <div
+                                    ref={deleteMenuRef}
+                                    className="bg-white/90 backdrop-blur-xl border border-black/5 rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.15),0_2px_8px_rgba(0,0,0,0.08)] p-1.5 min-w-[200px] animate-[delete-menu-in_0.2s_cubic-bezier(0.16,1,0.3,1)]"
+                                    style={{ position: 'fixed', top: deleteMenuPos.y, left: deleteMenuPos.x, zIndex: 100 }}
+                                >
+                                    <button className="flex items-center w-full px-3.5 py-2.5 border-none bg-transparent text-[13.5px] font-medium rounded-[10px] cursor-pointer transition-colors duration-150 text-left text-blue-500 hover:bg-blue-50" onClick={() => handleReply(deleteMenuMsg)}>
+                                        <FontAwesomeIcon icon={faReply} className="mr-2.5 text-xs" />
+                                        Reply
+                                    </button>
+                                    {deleteMenuMsg.senderId === currentUser?.id && (
+                                        <button className="flex items-center w-full px-3.5 py-2.5 border-none bg-transparent text-[13.5px] font-medium rounded-[10px] cursor-pointer transition-colors duration-150 text-left text-red-500 hover:bg-red-50" onClick={() => deleteForEveryone(deleteMenuMsg)}>
+                                            <FontAwesomeIcon icon={faTrash} className="mr-2.5 text-xs" />
+                                            Delete for everyone
+                                        </button>
+                                    )}
+                                    <button className="flex items-center w-full px-3.5 py-2.5 border-none bg-transparent text-[13.5px] font-medium rounded-[10px] cursor-pointer transition-colors duration-150 text-left text-amber-500 hover:bg-amber-50" onClick={() => deleteForMe(deleteMenuMsg)}>
+                                        <FontAwesomeIcon icon={faTrash} className="mr-2.5 text-xs" />
+                                        Delete for me
+                                    </button>
+                                    <button className="flex items-center w-full px-3.5 py-2.5 border-none bg-transparent text-[13.5px] font-medium cursor-pointer transition-colors duration-150 text-gray-500 justify-center mt-0.5 border-t border-gray-100 rounded-b-[10px] rounded-t-none hover:bg-gray-50" onClick={() => setDeleteMenuMsg(null)}>
+                                        Cancel
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
                         {/* Premium Input Bar */}
-                        <div className="p-3 sm:p-6 bg-white border-t border-gray-100">
-                            <div className="max-w-4xl mx-auto flex items-center space-x-2 sm:space-x-3">
-                                <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-3xl pl-3 sm:pl-4 pr-12 sm:pr-14 py-1.5 sm:py-2 relative transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 focus-within:bg-white shadow-inner">
-                                    <input
-                                        value={text}
-                                        onChange={(e) => setText(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                handleSend();
-                                            }
-                                        }}
-                                        type="text"
-                                        placeholder={isRecording ? "Recording audio..." : "Message..."}
-                                        disabled={isRecording}
-                                        className="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 text-sm font-medium py-2.5 sm:py-3 px-2 sm:px-4 placeholder-gray-400 outline-none w-full"
-                                    />
-                                    <div className="absolute right-2 sm:right-4 flex items-center bg-transparent">
-                                        {uploading ? (
-                                            <span className="text-xs text-blue-500 animate-pulse font-medium mr-1">...</span>
-                                        ) : (
-                                            <>
-                                            <button 
-                                                onClick={isRecording ? stopRecording : startRecording}
-                                                className={`cursor-pointer transition-colors p-1.5 flex items-center justify-center rounded-full ${isRecording ? 'text-red-500 animate-pulse bg-red-50' : 'text-gray-400 hover:text-blue-600'}`}
-                                            >
-                                                <FontAwesomeIcon icon={faMicrophone} className="text-xl sm:text-2xl" />
-                                            </button>
-                                            <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors p-1.5 flex items-center justify-center">
-                                                <FontAwesomeIcon icon={faImage} className="text-xl sm:text-2xl" />
-                                                <input 
-                                                    type="file" 
-                                                    accept="image/*" 
-                                                    className="hidden" 
-                                                    onChange={handleImageUpload}
-                                                    disabled={uploading}
-                                                />
-                                            </label>
-                                            </>
-                                        )}
+                        <div className="p-3 sm:p-6 bg-white border-t border-gray-100 flex flex-col">
+                            {/* ── Replying To Indicator ── */}
+                            {replyingTo && (
+                                <div className="mb-2 max-w-4xl mx-auto w-full animate-fade-in-up">
+                                    <div className="bg-gray-50 flex items-center justify-between p-3 rounded-xl border border-gray-200 border-l-4 border-l-blue-500 relative shadow-sm">
+                                        <div className="flex flex-col min-w-0 flex-1 pl-1">
+                                            <span className="text-xs font-bold text-blue-600 mb-0.5">Replying to {replyingTo.senderName}</span>
+                                            <span className="text-xs text-gray-500 truncate pr-4">{replyingTo.text}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => setReplyingTo(null)}
+                                            className="text-gray-400 hover:text-gray-600 p-2 transition-colors rounded-full hover:bg-gray-200"
+                                            title="Cancel Reply"
+                                        >
+                                            <FontAwesomeIcon icon={faTimes} />
+                                        </button>
                                     </div>
                                 </div>
+                            )}
 
-                                <button onClick={handleSend}
-                                    className="w-11 h-11 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full sm:rounded-2xl shadow-lg sm:shadow-xl shadow-blue-200 transition-all active:scale-95 group">
-                                    <FontAwesomeIcon icon={faPaperPlane} className="group-hover:rotate-12 transition-transform text-sm sm:text-base" />
-                                </button>
+                            <div className="max-w-4xl mx-auto flex items-center space-x-2 sm:space-x-3 w-full">
+                                {isRecording ? (
+                                    /* ── Recording Strip ── */
+                                    <div className="flex-1 flex items-center gap-3 bg-gradient-to-br from-red-50 to-rose-50 border-[1.5px] border-red-200 rounded-full py-2 pl-2 pr-3 animate-[fade-in-up_0.3s_ease-out]">
+                                        <button onClick={cancelRecording} className="w-9 h-9 rounded-full bg-red-100 text-red-500 flex items-center justify-center cursor-pointer text-sm transition-all duration-150 shrink-0 hover:bg-red-200 hover:scale-[1.08]" title="Cancel">
+                                            <FontAwesomeIcon icon={faTrash} />
+                                        </button>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-[rec-pulse_1s_ease-in-out_infinite]" />
+                                            <span className="text-[13px] font-semibold text-red-500">Recording</span>
+                                        </div>
+                                        <span className="text-sm font-bold text-red-700 tabular-nums min-w-[42px]">{formatRecTime(recordingTime)}</span>
+                                        <div className="flex items-center justify-center gap-[2px] flex-1 h-6">
+                                            {[...Array(12)].map((_, i) => (
+                                                <span key={i} className="w-[3px] rounded-full bg-red-400 animate-[rec-bar-anim_0.8s_ease-in-out_infinite_alternate]" style={{ animationDelay: `${i * 0.08}s` }} />
+                                            ))}
+                                        </div>
+                                        <button onClick={stopRecording} className="w-11 h-11 rounded-full bg-red-500 text-white flex items-center justify-center cursor-pointer text-base shrink-0 shadow-[0_4px_14px_rgba(239,68,68,0.35)] transition-all duration-150 hover:bg-red-600 hover:scale-[1.06] active:scale-95" title="Send">
+                                            <FontAwesomeIcon icon={faPaperPlane} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    /* ── Normal Input ── */
+                                    <>
+                                    <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-3xl pl-3 sm:pl-4 pr-12 sm:pr-14 py-1.5 sm:py-2 relative transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 focus-within:bg-white shadow-inner">
+                                        <input
+                                            id="chat-text-input"
+                                            value={text}
+                                            onChange={(e) => setText(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    handleSend();
+                                                }
+                                            }}
+                                            type="text"
+                                            placeholder="Message..."
+                                            className="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 text-sm font-medium py-2.5 sm:py-3 px-2 sm:px-4 placeholder-gray-400 outline-none w-full"
+                                        />
+                                        <div className="absolute right-2 sm:right-4 flex items-center bg-transparent">
+                                            {uploading ? (
+                                                <span className="text-xs text-blue-500 animate-pulse font-medium mr-1">...</span>
+                                            ) : (
+                                                <>
+                                                <button 
+                                                    onClick={startRecording}
+                                                    className="cursor-pointer transition-colors p-1.5 flex items-center justify-center rounded-full text-gray-400 hover:text-blue-600"
+                                                >
+                                                    <FontAwesomeIcon icon={faMicrophone} className="text-xl sm:text-2xl" />
+                                                </button>
+                                                <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors p-1.5 flex items-center justify-center">
+                                                    <FontAwesomeIcon icon={faPaperclip} className="text-xl sm:text-2xl" />
+                                                    <input 
+                                                        type="file" 
+                                                        accept="*/*" 
+                                                        className="hidden" 
+                                                        onChange={handleFileUpload}
+                                                        disabled={uploading}
+                                                    />
+                                                </label>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <button onClick={handleSend}
+                                        className="w-11 h-11 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full sm:rounded-2xl shadow-lg sm:shadow-xl shadow-blue-200 transition-all active:scale-95 group">
+                                        <FontAwesomeIcon icon={faPaperPlane} className="group-hover:rotate-12 transition-transform text-sm sm:text-base" />
+                                    </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </>
@@ -694,6 +1123,22 @@ const uploadAudioFile = async (file) => {
                 .scrollbar-hide {
                   -ms-overflow-style: none;
                   scrollbar-width: none;
+                }
+                @keyframes bar-bounce {
+                    0%, 100% { transform: scaleY(1); }
+                    50% { transform: scaleY(1.25); }
+                }
+                @keyframes rec-pulse {
+                    0%, 100% { opacity: 1; transform: scale(1); }
+                    50% { opacity: 0.4; transform: scale(0.8); }
+                }
+                @keyframes rec-bar-anim {
+                    0% { height: 6px; }
+                    100% { height: 20px; }
+                }
+                @keyframes delete-menu-in {
+                    from { opacity: 0; transform: scale(0.9) translateY(8px); }
+                    to { opacity: 1; transform: scale(1) translateY(0); }
                 }
             `}</style>
         </div>
