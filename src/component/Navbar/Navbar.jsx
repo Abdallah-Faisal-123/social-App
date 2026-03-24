@@ -2,11 +2,91 @@
 import { faBell, faBars, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { faSquareShareNodes } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Link, NavLink } from "react-router";
-import { useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router";
+import { useState, useEffect, useRef } from "react";
+import { getCurrentUser } from "../../utils/getUser";
+import { collectionGroup, onSnapshot, query, where } from "firebase/firestore";
+import { db } from "../../pages/Chat/firebase";
+import { toast } from "react-toastify";
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const isInitialLoad = useRef(true);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let unsubscribe = null;
+    const initNotifications = async () => {
+        const user = await getCurrentUser();
+        if (!user) return;
+
+        const q = query(collectionGroup(db, 'messages'), where('read', '==', false));
+        unsubscribe = onSnapshot(q, (snapshot) => {
+            let count = 0;
+            snapshot.forEach(doc => {
+                const parentId = doc.ref.parent.parent?.id;
+                if (parentId && parentId.includes(String(user.id))) {
+                    const data = doc.data();
+                    if (String(data.senderId) !== String(user.id)) {
+                        count++;
+                    }
+                }
+            });
+            setUnreadCount(count);
+
+            // Handle interactive popup notifications with synthesized audio chime
+            if (!isInitialLoad.current) {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        const data = change.doc.data();
+                        const parentId = change.doc.ref.parent.parent?.id;
+                        if (parentId && parentId.includes(String(user.id))) {
+                            if (String(data.senderId) !== String(user.id)) {
+                                const textPreview = data.text || (data.img ? "Photo 📷" : data.audio ? "Audio 🎵" : data.video ? "Video 🎥" : data.file ? "File 📎" : "Attachment");
+                                toast.info(`New Message: ${textPreview.length > 30 ? textPreview.substring(0, 30) + '...' : textPreview}`, {
+                                    icon: "💬",
+                                    onClick: () => navigate('/chat'),
+                                    autoClose: 4000
+                                });
+
+                                // Play a highly optimized native Web Audio bell tone uniquely avoiding external file dependencies
+                                try {
+                                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                                    const oscillator = audioCtx.createOscillator();
+                                    const gainNode = audioCtx.createGain();
+                                    oscillator.type = 'sine';
+                                    oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+                                    oscillator.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.15);
+                                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                                    oscillator.connect(gainNode);
+                                    gainNode.connect(audioCtx.destination);
+                                    oscillator.start();
+                                    oscillator.stop(audioCtx.currentTime + 0.2);
+                                } catch(e) { console.error("Audio block fallback:", e); }
+                            }
+                        }
+                    }
+                });
+            } else {
+                if (count > 0) {
+                    toast.info(`You have ${count} unread message${count > 1 ? 's' : ''} waiting!`, {
+                        icon: "🔔",
+                        onClick: () => navigate('/notifications'),
+                        autoClose: 5000
+                    });
+                }
+                isInitialLoad.current = false;
+            }
+        });
+    };
+    initNotifications();
+
+    return () => {
+        if (unsubscribe) unsubscribe();
+    };
+  }, [navigate]);
 
   return (
     <>
@@ -49,10 +129,14 @@ export default function Navbar() {
 
           <div className="flex items-center gap-2">
             {/* Notification Bell */}
-            <button className="relative w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200">
+            <Link to="/notifications" className="relative w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200">
               <FontAwesomeIcon icon={faBell} className="text-lg" />
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full ring-2 ring-white animate-pulse"></span>
-            </button>
+              {unreadCount > 0 && (
+                  <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-sm ring-2 ring-white animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]">
+                      {unreadCount}
+                  </span>
+              )}
+            </Link>
 
             {/* Mobile Menu Button */}
             <button

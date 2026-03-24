@@ -29,7 +29,7 @@ import {
     faFileAlt
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
-import { collection, query, orderBy, limit, getDocs, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, getDoc, writeBatch, collectionGroup } from 'firebase/firestore';
 
 import { saveContact } from '../../utils/useSaveContact';
 import { db } from './firebase';
@@ -174,10 +174,100 @@ const [moreFrnds, setMoreFrnds] = useState(() => {
             }
         });
 
+        // Also fetch saved contacts directly from Firebase so they are never lost
+        try {
+            const myContactsRef = collection(db, "users", String(currentUser.id), "myContacts");
+            const contactsSnap = await getDocs(myContactsRef);
+            contactsSnap.forEach(docSnap => {
+                const data = docSnap.data();
+                allPossibleContacts.push({
+                    _id: data.userId,
+                    name: data.username,
+                    photo: data.photo,
+                    chatId: data.chatId
+                });
+            });
+        } catch (err) {
+            console.error("Error fetching myContacts:", err);
+        }
+
         const uniqueMap = new Map();
         allPossibleContacts.forEach(u => {
             if (u && u._id !== currentUser.id) uniqueMap.set(u._id, u);
         });
+
+        // Absolute Safety Net: Aggressively scan ALL messages directly from Firebase
+        // This finds 'phantom' old chats where the contact doesn't exist in the API paginations at all!
+        try {
+            const allMsgsSnap = await getDocs(collectionGroup(db, 'messages'));
+            const shadowPromises = [];
+            
+            allMsgsSnap.forEach(docSnap => {
+                const parentPath = docSnap.ref.parent.parent?.id; // 'user1_user2'
+                if (parentPath && parentPath.includes(String(currentUser.id))) {
+                    const parts = parentPath.split('_');
+                    if (parts.length === 2) {
+                        const otherId = parts[0] === String(currentUser.id) ? parts[1] : parts[0];
+                        if (otherId && !uniqueMap.has(otherId)) {
+                            const msgData = docSnap.data();
+                            // If they are missing, attempt to extract their real API profile by checking their posts!
+                            let suspectedName = msgData.replyTo?.senderName || "Contact";
+                            let suspectedPhoto = "https://api.dicebear.com/7.x/avataaars/svg?seed=" + otherId;
+                            
+                            // Immediately mark to prevent processing duplicate messages for this same hidden user
+                            uniqueMap.set(otherId, { _id: otherId });
+                            
+                            shadowPromises.push((async () => {
+                                try {
+                                    const pfCheck = await axios.get(`https://route-posts.routemisr.com/users/${otherId}/posts`, {
+                                        headers: { Authorization: `Bearer ${token}` }
+                                    });
+                                    if (pfCheck.data?.data?.posts?.length > 0) {
+                                        const extUser = pfCheck.data.data.posts[0].user;
+                                        if (extUser) {
+                                            suspectedName = extUser.name || suspectedName;
+                                            suspectedPhoto = extUser.photo || suspectedPhoto;
+                                        }
+                                    } else {
+                                        throw new Error("Force deep search");
+                                    }
+                                } catch(e) {
+                                    // Silent failure on posts. Aggressively search up to 50 depth pages of the suggestions API!
+                                    for (let searchPage = 1; searchPage <= 50; searchPage++) {
+                                        try {
+                                            const pgRes = await axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=100&page=${searchPage}`, {
+                                                headers: { Authorization: `Bearer ${token}` }
+                                            });
+                                            const candidates = pgRes.data?.data?.suggestions || [];
+                                            const match = candidates.find(c => c._id === otherId);
+                                            if (match) {
+                                                suspectedName = match.name;
+                                                suspectedPhoto = match.photo;
+                                                break;
+                                            }
+                                            if (candidates.length === 0) break; // Exhausted API
+                                        } catch (pgErr) { break; }
+                                    }
+                                }
+
+                                uniqueMap.set(otherId, {
+                                    _id: otherId,
+                                    name: suspectedName,
+                                    photo: suspectedPhoto,
+                                    chatId: parentPath
+                                });
+                            })());
+                        }
+                    }
+                }
+            });
+            
+            if (shadowPromises.length > 0) {
+                await Promise.all(shadowPromises);
+            }
+        } catch (err) {
+            console.error("Error spanning collectionGroup for shadow contacts:", err);
+        }
 
         const usersArray = Array.from(uniqueMap.values());
 
@@ -193,10 +283,19 @@ const [moreFrnds, setMoreFrnds] = useState(() => {
                 const statusSnap = await getDoc(statusRef);
                 const online = statusSnap.exists() ? statusSnap.data().online : false;
                 const lastDoc = querySnapshot.docs[0].data();
+                
+                let msgContent = lastDoc.text;
+                if (!msgContent) {
+                    if (lastDoc.img) msgContent = "Photo 📷";
+                    else if (lastDoc.audio) msgContent = "Audio 🎵";
+                    else if (lastDoc.video) msgContent = "Video 🎥";
+                    else if (lastDoc.file) msgContent = "File 📎";
+                }
+
                 return {
                     ...user,
                     online,
-                    lastMsg: lastDoc.text || (lastDoc.img ? "Photo 📷" : ""),
+                    lastMsg: msgContent || "",
                    rawTime: lastDoc.createdAt?.seconds || 0,
                     time: lastDoc.createdAt?.seconds
                         ? new Date(lastDoc.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
