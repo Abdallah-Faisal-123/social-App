@@ -3,18 +3,46 @@ import { faBell, faBars, faXmark } from "@fortawesome/free-solid-svg-icons";
 import { faSquareShareNodes } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link, NavLink, useNavigate } from "react-router";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useContext } from "react";
 import { getCurrentUser } from "../../utils/getUser";
 import { collectionGroup, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../../pages/Chat/firebase";
 import { toast } from "react-toastify";
+import axios from "axios";
+import { AuthContext } from "../../component/Authcontext/Authcontext";
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [apiUnreadCount, setApiUnreadCount] = useState(0);
   const isInitialLoad = useRef(true);
   const navigate = useNavigate();
+  const { token } = useContext(AuthContext);
 
+  const unreadCount = chatUnreadCount + apiUnreadCount;
+
+  // 1. Fetch API Unread Count
+  useEffect(() => {
+     if (!token) return;
+     const fetchUnread = async () => {
+         try {
+             const { data } = await axios.get('https://route-posts.routemisr.com/notifications/unread-count', {
+                 headers: { Authorization: `Bearer ${token}` }
+             });
+             const num = data?.numOfUnReadNotifications ?? data?.unreadCount ?? data?.count ?? data?.data?.count ?? data?.data?.unReadCount ?? 0;
+             setApiUnreadCount(Number(num));
+         } catch (e) {
+             console.error("Failed fetching unread count from API:", e);
+         }
+     };
+     fetchUnread();
+
+     const handleUpdate = () => { fetchUnread(); };
+     window.addEventListener('updateNotificationCount', handleUpdate);
+     return () => window.removeEventListener('updateNotificationCount', handleUpdate);
+  }, [token]);
+
+  // 2. Firebase Chat Real-time Unread Count
   useEffect(() => {
     let unsubscribe = null;
     const initNotifications = async () => {
@@ -33,7 +61,7 @@ export default function Navbar() {
                     }
                 }
             });
-            setUnreadCount(count);
+            setChatUnreadCount(count);
 
             // Handle interactive popup notifications with synthesized audio chime
             if (!isInitialLoad.current) {
@@ -50,7 +78,7 @@ export default function Navbar() {
                                     autoClose: 4000
                                 });
 
-                                // Play a highly optimized native Web Audio bell tone uniquely avoiding external file dependencies
+                                // Play a highly optimized native Web Audio bell tone
                                 try {
                                     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                                     const oscillator = audioCtx.createOscillator();
@@ -71,7 +99,7 @@ export default function Navbar() {
                 });
             } else {
                 if (count > 0) {
-                    toast.info(`You have ${count} unread message${count > 1 ? 's' : ''} waiting!`, {
+                    toast.info(`You have ${count} unread chat message${count > 1 ? 's' : ''} waiting!`, {
                         icon: "🔔",
                         onClick: () => navigate('/notifications'),
                         autoClose: 5000
@@ -111,8 +139,13 @@ export default function Navbar() {
               </NavLink>
             </li>
             <li>
-              <NavLink to="/chat" className={({ isActive }) => `px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'}`}>
+              <NavLink to="/chat" className={({ isActive }) => `relative px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'}`}>
                 Chat
+                {chatUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow ring-2 ring-white">
+                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </span>
+                )}
               </NavLink>
             </li>
             <li>
@@ -141,10 +174,13 @@ export default function Navbar() {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200"
+              className="relative md:hidden w-10 h-10 flex items-center justify-center rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200"
               aria-label="Toggle menu"
             >
               <FontAwesomeIcon icon={isMobileMenuOpen ? faXmark : faBars} className="text-lg" />
+              {chatUnreadCount > 0 && !isMobileMenuOpen && (
+                <span className="absolute top-0.5 right-0.5 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white" />
+              )}
             </button>
           </div>
         </div>
@@ -165,9 +201,14 @@ export default function Navbar() {
               <NavLink
                 to="/chat"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={({ isActive }) => `${isActive ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-slate-600 hover:bg-slate-50'} font-semibold transition-all duration-200 block px-4 py-3 rounded-xl`}
+                className={({ isActive }) => `relative flex items-center justify-between ${isActive ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-slate-600 hover:bg-slate-50'} font-semibold transition-all duration-200 block px-4 py-3 rounded-xl`}
               >
-                Chat
+                <span>Chat</span>
+                {chatUnreadCount > 0 && (
+                  <span className="min-w-[20px] h-5 px-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow">
+                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </span>
+                )}
               </NavLink>
             </li>
             <li>

@@ -1,18 +1,23 @@
 import React, { useState, useEffect, useContext } from 'react';
 import Navbar from '../../component/Navbar/Navbar';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell, faCommentDots, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faCommentDots, faTrashAlt, faUserPlus, faHeart, faComment } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
 import { getCurrentUser } from '../../utils/getUser';
-import { collection, query, orderBy, getDocs, doc, updateDoc, writeBatch, collectionGroup } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, writeBatch, collectionGroup, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../Chat/firebase';
 import { Link } from 'react-router';
+import axios from 'axios';
+import { useCallback } from 'react';
 
 export default function Notifications() {
     const { token } = useContext(AuthContext);
     const [currentUser, setCurrentUser] = useState(null);
-    const [notifications, setNotifications] = useState([]);
+    const [apiNotifications, setApiNotifications] = useState([]);
+    const [chatNotifications, setChatNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    const notifications = [...apiNotifications, ...chatNotifications].sort((a, b) => b.time - a.time);
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -22,63 +27,147 @@ export default function Notifications() {
         fetchUser();
     }, []);
 
+    // 1. Fetch REST API Notifications (Likes, follows, shares)
+    const fetchApiNotifs = useCallback(async (isBackgroundSync = false) => {
+        if (!token) return;
+        if (!isBackgroundSync) setLoading(true);
+        try {
+            const { data } = await axios.get("https://route-posts.routemisr.com/notifications?unread=false&page=1&limit=50", {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            const list = data?.data?.notifications || data?.notifications || data?.data || [];
+            const parsedNotifs = list.map(n => ({
+                id: n._id || n.id || n.notificationId || Math.random().toString(),
+                isChat: false,
+                text: n.message || n.content || n.body || "New activity on your account",
+                time: new Date(n.createdAt || Date.now()),
+                read: n.isRead ?? n.read ?? false,
+                type: n.type || 'system',
+                senderId: n.user?._id || n.sender?._id || n.user?.id || '',
+                raw: n
+            }));
+            setApiNotifications(parsedNotifs);
+        } catch (e) {
+            console.error("Failed to fetch API notifications:", e);
+        } finally {
+            if (!isBackgroundSync) setLoading(false);
+        }
+    }, [token]);
+
+    useEffect(() => {
+        fetchApiNotifs();
+    }, [fetchApiNotifs]);
+
+    // 2. Real-time Firebase Chat Notifications (Unread messages)
     useEffect(() => {
         if (!currentUser) return;
-        
-        const fetchNotifications = async () => {
-            try {
-                // To fetch all notifications, we find unread messages sent TO this user.
-                // We use collectionGroup 'messages' and filter locally for simplicity and speed in this demo environment
-                const msgsRef = collectionGroup(db, 'messages');
-                const msgsSnap = await getDocs(msgsRef);
+
+        const msgsRef = collectionGroup(db, 'messages');
+        const q = query(msgsRef, where('read', '==', false)); 
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const newChatNotifs = [];
+            snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                const parentId = docSnap.ref.parent.parent?.id; // user1_user2
                 
-                const myNotifs = [];
-                
-                msgsSnap.forEach(docSnap => {
-                    const data = docSnap.data();
-                    const parentId = docSnap.ref.parent.parent?.id; // user1_user2
-                    
-                    if (parentId && parentId.includes(String(currentUser.id))) {
-                        // Ensure the message was NOT sent by us, and is Unread!
-                        if (String(data.senderId) !== String(currentUser.id) && data.read === false) {
-                            myNotifs.push({
-                                id: docSnap.id,
-                                ref: docSnap.ref,
-                                chatId: parentId,
-                                text: data.text || (data.img ? "Photo 📷" : data.audio ? "Audio 🎵" : data.video ? "Video 🎥" : data.file ? "File 📎" : "New Attachment"),
-                                senderId: data.senderId,
-                                time: data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000) : new Date()
-                            });
-                        }
+                if (parentId && parentId.includes(String(currentUser.id))) {
+                    if (String(data.senderId) !== String(currentUser.id)) {
+                        newChatNotifs.push({
+                            id: docSnap.id,
+                            ref: docSnap.ref,
+                            isChat: true,
+                            chatId: parentId,
+                            senderId: data.senderId,
+                            text: data.text || (data.img ? "Photo 📷" : data.audio ? "Audio 🎵" : data.video ? "Video 🎥" : data.file ? "File 📎" : "New Attachment"),
+                            time: data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000) : new Date(),
+                            read: false
+                        });
                     }
-                });
+                }
+            });
+            setChatNotifications(newChatNotifs);
+        }, (error) => {
+            console.error("Chat notifications snapshot error:", error);
+        });
 
-                // Sort by newest
-                myNotifs.sort((a, b) => b.time - a.time);
-                
-                setNotifications(myNotifs);
-            } catch (err) {
-                console.error("Failed to load notifications", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchNotifications();
+        return () => unsubscribe();
     }, [currentUser]);
 
     const markAllAsRead = async () => {
         if (notifications.length === 0) return;
         try {
+            // Firebase batch
             const batch = writeBatch(db);
-            notifications.forEach(n => {
-                batch.update(n.ref, { read: true });
-            });
-            await batch.commit();
-            setNotifications([]);
+            const firebaseNotifs = notifications.filter(n => n.isChat && n.ref && !n.read);
+            firebaseNotifs.forEach(n => batch.update(n.ref, { read: true }));
+            if (firebaseNotifs.length > 0) await batch.commit();
+
+            // REST API bulk mark-read
+            const unreadApiNotifs = apiNotifications.filter(n => !n.read);
+            if (unreadApiNotifs.length > 0) {
+                // Optimistic UI clear
+                setApiNotifications(prev => prev.map(n => ({...n, read: true})));
+                window.dispatchEvent(new Event('updateNotificationCount'));
+
+                await axios.patch(`https://route-posts.routemisr.com/notifications/read-all`, {}, {
+                    headers: { Authorization: `Bearer ${token}` }
+                }).catch(() => null);
+
+                // Background sync
+                fetchApiNotifs(true);
+            }
         } catch (e) {
             console.error("Error clearing notifications", e);
         }
+    };
+
+    const handleReadClick = async (notif, e) => {
+        if (!notif.isChat && e) {
+            e.preventDefault();
+        }
+
+        if (notif.read) return;
+        
+        if (notif.isChat && notif.ref) {
+            try { await updateDoc(notif.ref, { read: true }); } catch (er) {}
+        } else if (!notif.isChat && notif.id) {
+            // Optimistic update
+            setApiNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+            window.dispatchEvent(new Event('updateNotificationCount'));
+            
+            try {
+                // The API requires PATCH for marking read
+                await axios.patch(`https://route-posts.routemisr.com/notifications/${notif.id}/read`, {}, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                // Background double-check sync with DB
+                fetchApiNotifs(true);
+            } catch (error) {
+                console.error("Failed to mark API notification as read", error);
+            }
+        }
+    };
+
+    const getIconForType = (type, isChat) => {
+        if (isChat) return faCommentDots;
+        if (!type) return faBell;
+        
+        const t = type.toLowerCase();
+        if (t.includes('follow') || t === 'follow') return faUserPlus;
+        if (t.includes('like') || t === 'like') return faHeart;
+        if (t.includes('comment') || t === 'comment') return faComment;
+        return faBell;
+    };
+
+    const getColorClass = (type, isChat) => {
+        if (isChat) return 'from-indigo-500 to-purple-600 shadow-indigo-200';
+        
+        const t = (type || '').toLowerCase();
+        if (t.includes('like')) return 'from-rose-400 to-pink-500 shadow-pink-200';
+        if (t.includes('follow')) return 'from-emerald-400 to-teal-500 shadow-teal-200';
+        return 'from-blue-400 to-cyan-500 shadow-blue-200';
     };
 
     return (
@@ -94,14 +183,14 @@ export default function Notifications() {
                             </span>
                             Notifications
                         </h1>
-                        <p className="text-slate-400 text-sm mt-1 ml-1 font-medium">You have {notifications.length} unread updates</p>
+                        <p className="text-slate-400 text-sm mt-1 ml-1 font-medium">You have {notifications.length} updates</p>
                     </div>
                     {notifications.length > 0 && (
                         <button 
                             onClick={markAllAsRead} 
                             className="text-xs font-bold text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors flex items-center gap-1.5 p-2 bg-white rounded-xl shadow-sm border border-slate-100 cursor-pointer active:scale-95"
                         >
-                            <FontAwesomeIcon icon={faTrashAlt} /> Clear All
+                             Read  All
                         </button>
                     )}
                 </div>
@@ -124,26 +213,31 @@ export default function Notifications() {
                         <div className="divide-y divide-slate-50">
                             {notifications.map((notif, index) => (
                                 <Link 
-                                    to={`/chat`} 
+                                    onClick={(e) => handleReadClick(notif, e)}
+                                    to={notif.isChat ? `/chat?user=${notif.senderId}` : '#'} 
                                     key={notif.id} 
-                                    className="block p-5 hover:bg-slate-50 transition-colors animate-fade-in-up"
+                                    className={`block p-5 transition-colors animate-fade-in-up ${notif.read ? 'bg-white hover:bg-slate-50' : 'bg-slate-50/50 hover:bg-indigo-50/50'}`}
                                     style={{ animationDelay: `${index * 0.05}s` }}
                                 >
                                     <div className="flex gap-4 items-start">
                                         <div className="relative mt-1">
-                                            <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg shadow-md shadow-indigo-200">
-                                                <FontAwesomeIcon icon={faCommentDots} />
+                                            <div className={`w-12 h-12 bg-gradient-to-br rounded-full flex items-center justify-center text-white text-lg shadow-md ${getColorClass(notif.type, notif.isChat)}`}>
+                                                <FontAwesomeIcon icon={getIconForType(notif.type, notif.isChat)} />
                                             </div>
-                                            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-rose-500 rounded-full ring-2 ring-white"></span>
+                                            {!notif.read && (
+                                                <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-rose-500 rounded-full ring-2 ring-white"></span>
+                                            )}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">
-                                                New Message
-                                                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 bg-rose-50 px-2 rounded-full">Unread</span>
+                                                {notif.isChat ? "New Message" : "Activity Notification"}
+                                                {!notif.read && (
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-rose-500 bg-rose-50 px-2 rounded-full">New</span>
+                                                )}
                                             </p>
                                             <p className="text-sm text-slate-500 mt-0.5 max-w-full truncate">{notif.text}</p>
                                             <p className="text-xs text-slate-400 mt-1.5 font-medium">
-                                                {notif.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {notif.time.toLocaleDateString([], { month: 'short', day: 'numeric' })} at {notif.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </div>
                                     </div>

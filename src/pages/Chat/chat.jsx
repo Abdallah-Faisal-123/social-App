@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useContext, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router';
 import { getCurrentUser } from "../../utils/getUser";
 import { useChatMessages } from "../../utils/useChatMessages";
 import { sendMessage } from "../../utils/sendMessage";
@@ -29,7 +30,7 @@ import {
     faFileAlt
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
-import { collection, query, orderBy, limit, getDocs, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, getDoc, writeBatch, collectionGroup } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, getDoc, writeBatch, collectionGroup, where } from 'firebase/firestore';
 
 import { saveContact } from '../../utils/useSaveContact';
 import { db } from './firebase';
@@ -417,12 +418,111 @@ useEffect(() => {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(true);
     const [text, setText] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [unreadCountMap, setUnreadCountMap] = useState({}); // map of userId -> unread count
+
+    // Real-time unread count per contact
+    useEffect(() => {
+        const uid = currentUser?.id;
+        if (!uid) return;
+        const q = query(collectionGroup(db, 'messages'), where('read', '==', false));
+        const unsub = onSnapshot(q, (snapshot) => {
+            const counts = {};
+            snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                const chatDocId = docSnap.ref.parent.parent?.id; // e.g. "uid1_uid2"
+                if (!chatDocId || !chatDocId.includes(String(uid))) return;
+                if (String(data.senderId) === String(uid)) return; // message I sent
+                const parts = chatDocId.split('_');
+                const otherId = parts[0] === String(uid) ? parts[1] : parts[0];
+                if (otherId) counts[otherId] = (counts[otherId] || 0) + 1;
+            });
+            setUnreadCountMap(counts);
+        }, (err) => console.error('unreadCountMap snapshot error:', err));
+        return () => unsub();
+    }, [currentUser?.id]); // use primitive id, not object reference
+
+    // Check URL parameters for direct chat link (e.g., from notifications)
+    useEffect(() => {
+        const targetUserId = searchParams.get("user");
+        if (!targetUserId || !currentUser || !token || !lastUsers) return;
+        
+        // If they are already selected, we don't need to do anything
+        if (selectedUser && String(selectedUser._id) === targetUserId) return;
+
+        const connectTargetUser = async () => {
+            const foundLocal = lastUsers.find(u => String(u._id) === targetUserId);
+            if (foundLocal) {
+                setSelectedUser(foundLocal);
+                setMobileSidebarOpen(false);
+                // remove user param so a refresh doesn't lock them here
+                searchParams.delete("user");
+                setSearchParams(searchParams, { replace: true });
+            } else {
+                // Not in our known list, ping API directly so they can be selected!
+                try {
+                    const res = await axios.get(`https://route-posts.routemisr.com/users/${targetUserId}/profile`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const u = res.data?.user || res.data?.data?.user;
+                    if (u && u._id) {
+                        const newContactObj = { ...u, online: false, lastMsg: 'Start chatting...', time: '' };
+                        setSelectedUser(newContactObj);
+                        setMobileSidebarOpen(false);
+                        searchParams.delete("user");
+                        setSearchParams(searchParams, { replace: true });
+                    }
+                } catch(err) {
+                    console.error("Failed fetching external user for chat:", err);
+                }
+            }
+        };
+
+        // Delay checking just briefly to allow lastUsers to finish its initial population
+        const timer = setTimeout(connectTargetUser, 300);
+        return () => clearTimeout(timer);
+    }, [searchParams, currentUser, token, lastUsers, selectedUser, setSearchParams]);
 
     const chatId = selectedUser && currentUser
         ? [currentUser.id, selectedUser._id].sort().join("_")
         : null;
 
     const { messages, loadingMessages } = useChatMessages(chatId);
+
+    // Real-time mark-as-read: while this chat is open, any incoming unread message
+    // from the other user is immediately committed as read in Firestore
+    useEffect(() => {
+        if (!chatId || !currentUser?.id) return;
+
+        const msgsRef = collection(db, 'chats', chatId, 'messages');
+        const q = query(msgsRef, where('read', '==', false));
+
+        const unsub = onSnapshot(q, async (snapshot) => {
+            if (snapshot.empty) return;
+
+            const batch = writeBatch(db);
+            let hasUpdates = false;
+
+            snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                // Only mark messages from the OTHER person — not my own sent messages
+                if (String(data.senderId) !== String(currentUser.id)) {
+                    batch.update(docSnap.ref, { read: true });
+                    hasUpdates = true;
+                }
+            });
+
+            if (hasUpdates) {
+                try {
+                    await batch.commit();
+                } catch (e) {
+                    console.error('Real-time mark-as-read error:', e);
+                }
+            }
+        }, (err) => console.error('Mark-as-read snapshot error:', err));
+
+        return () => unsub();
+    }, [chatId, currentUser?.id]);
 
     const [selectedUserOnline, setSelectedUserOnline] = useState(false);
 
@@ -849,6 +949,8 @@ const handleDeleteContact = async (user) => {
                                     key={user._id}
                                     onClick={() => {
                                         setSelectedUser(user);
+                                        // Mark messages as read for this contact when opening chat
+                                        setUnreadCountMap(prev => ({ ...prev, [user._id]: 0 }));
                                         if (window.innerWidth < 1024) setMobileSidebarOpen(false);
                                     }}
                                     className={`group/contact flex items-center p-4 rounded-2xl cursor-pointer transition-all duration-300 ${selectedUser?._id === user._id
@@ -874,9 +976,16 @@ const handleDeleteContact = async (user) => {
                                                 {user?.time}
                                             </span>
                                         </div>
-                                        <p className={`text-sm truncate ${selectedUser?._id === user._id ? 'text-blue-50/80' : 'text-gray-500'}`}>
-                                            {user?.lastMsg}
-                                        </p>
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className={`text-sm truncate flex-1 ${selectedUser?._id === user._id ? 'text-blue-50/80' : unreadCountMap[user._id] > 0 ? 'text-gray-900 font-semibold' : 'text-gray-500'}`}>
+                                                {user?.lastMsg}
+                                            </p>
+                                            {unreadCountMap[user._id] > 0 && selectedUser?._id !== user._id && (
+                                                <span className="shrink-0 min-w-[20px] h-5 px-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm animate-pulse">
+                                                    {unreadCountMap[user._id]}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Delete contact button */}

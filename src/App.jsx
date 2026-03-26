@@ -3,6 +3,7 @@ import Home from "./pages/Home/Home";
 import Signup from "./pages/Signup/Signup";
 import Login from "./pages/Login/Login";
 import Profile from "./pages/Profile/Profile";
+import UserProfile from "./pages/UserProfile/UserProfile";
 import Postdetails from "./pages/Postdetails/Postdetails";
 import Notfound from "./pages/Notfound/Notfound";
 import Settings from "./pages/Settings/Settings";
@@ -25,8 +26,9 @@ function App() {
         { path: "signup", element: <AuthProtector><Signup /></AuthProtector> },
         { path: "login", element: <AuthProtector><Login /></AuthProtector> },
         { path: "profile", element: <ProtectedRoute><Profile /></ProtectedRoute> },
-        { path: "/postdetails/:id", element: <ProtectedRoute><Postdetails /></ProtectedRoute> },
-        { path: "/chat", element: <ProtectedRoute><Chat /></ProtectedRoute> },
+        { path: "user/:id", element: <ProtectedRoute><UserProfile /></ProtectedRoute> },
+        { path: "postdetails/:id", element: <ProtectedRoute><Postdetails /></ProtectedRoute> },
+        { path: "chat", element: <ProtectedRoute><Chat /></ProtectedRoute> },
         { path: "settings", element: <ProtectedRoute><Settings/></ProtectedRoute> },
         { path: "notifications", element: <ProtectedRoute><Notifications/></ProtectedRoute> },
         { path: "*", element: <Notfound /> },

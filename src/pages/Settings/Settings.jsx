@@ -47,6 +47,7 @@ export default function Settings() {
 
   const signOut = () => {
     localStorage.removeItem('token')
+    localStorage.removeItem('savedUsers')
     window.location.reload()
   }
 
