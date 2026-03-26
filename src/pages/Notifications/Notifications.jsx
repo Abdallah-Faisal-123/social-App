@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import Navbar from '../../component/Navbar/Navbar';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell, faCommentDots, faTrashAlt, faUserPlus, faHeart, faComment } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faCommentDots, faUserPlus, faHeart, faComment } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
 import { getCurrentUser } from '../../utils/getUser';
-import { collection, query, orderBy, getDocs, doc, updateDoc, writeBatch, collectionGroup, onSnapshot, where } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, collectionGroup, onSnapshot, where } from 'firebase/firestore';
 import { db } from '../Chat/firebase';
 import { Link } from 'react-router';
 import axios from 'axios';
@@ -20,11 +20,8 @@ export default function Notifications() {
     const notifications = [...apiNotifications, ...chatNotifications].sort((a, b) => b.time - a.time);
 
     useEffect(() => {
-        const fetchUser = async () => {
-            const user = await getCurrentUser();
+        const user = getCurrentUser();
             if (user) setCurrentUser(user);
-        };
-        fetchUser();
     }, []);
 
     // 1. Fetch REST API Notifications (Likes, follows, shares)
@@ -221,7 +218,7 @@ export default function Notifications() {
                                 >
                                     <div className="flex gap-4 items-start">
                                         <div className="relative mt-1">
-                                            <div className={`w-12 h-12 bg-gradient-to-br rounded-full flex items-center justify-center text-white text-lg shadow-md ${getColorClass(notif.type, notif.isChat)}`}>
+                                            <div className={`w-12 h-12 bg-linear-to-br rounded-full flex items-center justify-center text-white text-lg shadow-md ${getColorClass(notif.type, notif.isChat)}`}>
                                                 <FontAwesomeIcon icon={getIconForType(notif.type, notif.isChat)} />
                                             </div>
                                             {!notif.read && (

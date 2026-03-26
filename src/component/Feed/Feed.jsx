@@ -9,7 +9,7 @@ export default function Feed() {
   const [posts, setPosts] = useState(null)
   const { token } = useContext(AuthContext)
 
-  async function gitAllPosts() {
+  async function getAllPosts() {
     try {
       const options = {
         url: `https://route-posts.routemisr.com/posts`,
@@ -21,11 +21,11 @@ export default function Feed() {
       const{data} = await axios.request(options)
       setPosts(data.data.posts)
     } catch (error) {
-      console.log(error)
+      console.error(error)
     }
   }
   useEffect(() => {
-    gitAllPosts()
+    getAllPosts()
   }, [])
 
   return (
@@ -35,7 +35,7 @@ export default function Feed() {
       {posts ? (
         <div className="py-4 md:py-6">
           <div className="w-full sm:max-w-xl sm:mx-auto px-0 sm:px-2 stagger-children">
-            {[...posts].map((post) => <PostCard key={post._id} postInfo={post} />)}
+            {posts.map((post) => <PostCard key={post._id} postInfo={post} />)}
           </div>
         </div>
       ) : (

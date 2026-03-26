@@ -1,7 +1,6 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
-import { faCommentDots, faHeart, faThumbsUp, faShareNodes, faEllipsisVertical, faTrash, faEdit, faCheck, faXmark, faSpinner } from "@fortawesome/free-solid-svg-icons"
+import { faCommentDots, faHeart, faThumbsUp, faShareNodes, faEllipsisVertical, faTrash, faEdit, faSpinner } from "@fortawesome/free-solid-svg-icons"
 import { faThumbsUp as ThumbsUpRegular } from "@fortawesome/free-regular-svg-icons"
-import { faThumbsUp as LikesIcon } from "@fortawesome/free-solid-svg-icons"
 import Commentcard from "../Commentcard/Commentcard"
 import { Link } from "react-router"
 import { useContext, useEffect, useState, useRef } from "react"
@@ -239,7 +238,7 @@ export default function PostCard({ postInfo, commentsLimit = 3, onPostDeleted })
             <div className="py-2.5 mx-4 md:mx-5 flex justify-between text-xs md:text-sm text-slate-400 border-b border-slate-50">
               <div className="flex items-center gap-1">
                 <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-blue-500 text-white text-[10px]">
-                  <FontAwesomeIcon icon={LikesIcon} />
+                  <FontAwesomeIcon icon={faThumbsUp} />
                 </span>
                 <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-gradient-to-br from-rose-400 to-pink-500 text-white text-[10px]">
                   <FontAwesomeIcon icon={faHeart} />

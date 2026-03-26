@@ -22,41 +22,33 @@ export default function Navbar() {
   const { token } = useContext(AuthContext);
   const unreadCount = chatUnreadCount + apiUnreadCount;
 
-  // 1. Get current user and saved contacts (just exactly like chat page)
+  // 1. Get current user and saved contacts (just like chat page)
   useEffect(() => {
-    const fetchUser = async () => {
-      const u = await getCurrentUser();
-      setCurrentUser(u);
-    };
-    fetchUser();
-    
+    const user = getCurrentUser();
+    setCurrentUser(user);
+
     const getSavedUsers = async () => {
       try {
         const saved = localStorage.getItem("savedUsers");
-        const user = await getCurrentUser();
-        
-        let localUsers = [];
-        if (saved) {
-            localUsers = JSON.parse(saved);
-            setLastUsers(localUsers);
-        }
 
-        // Failsafe: if completely fresh and hasn't visited Chat page yet, ensure we actively check myContacts
-        if (!saved && user?.id) {
-            const contactsRef = collection(db, "users", String(user.id), "myContacts");
-            const snap = await getDocs(contactsRef);
-            const fbContacts = [];
-            snap.forEach(doc => {
-              if (doc.data().userId) {
-                fbContacts.push({ _id: doc.data().userId });
-              }
-            });
-            if (fbContacts.length > 0) {
-              setLastUsers(fbContacts);
+        if (saved) {
+          setLastUsers(JSON.parse(saved));
+        } else if (user?.id) {
+          // Failsafe: if fresh start and hasn't visited Chat page yet, read myContacts from Firebase
+          const contactsRef = collection(db, "users", String(user.id), "myContacts");
+          const snap = await getDocs(contactsRef);
+          const fbContacts = [];
+          snap.forEach(doc => {
+            if (doc.data().userId) {
+              fbContacts.push({ _id: doc.data().userId });
             }
+          });
+          if (fbContacts.length > 0) {
+            setLastUsers(fbContacts);
+          }
         }
       } catch (e) {
-          console.error("Error syncing users in Navbar:", e);
+        console.error("Error syncing users in Navbar:", e);
       }
     };
     getSavedUsers();
@@ -132,13 +124,13 @@ export default function Navbar() {
       <nav className="sticky top-0 z-50 glass border-b border-white/10 shadow-sm">
         <div className="container mx-auto py-3 px-4 sm:px-6 flex items-center justify-between">
 
-          <h1 className="flex-shrink-0">
+          <h1 className="shrink-0">
             <Link to="/" className="text-xl md:text-2xl font-extrabold flex items-center gap-2 group">
               <span className="relative">
-                <span className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl blur-sm opacity-60 group-hover:opacity-80 transition-opacity"></span>
-                <FontAwesomeIcon icon={faSquareShareNodes} className="relative text-white text-xl md:text-2xl bg-gradient-to-br from-indigo-500 to-purple-600 p-2 rounded-xl" />
+                <span className="absolute inset-0 bg-linear-to-br from-indigo-500 to-purple-600 rounded-xl blur-sm opacity-60 group-hover:opacity-80 transition-opacity"></span>
+                <FontAwesomeIcon icon={faSquareShareNodes} className="relative text-white text-xl md:text-2xl bg-linear-to-br from-indigo-500 to-purple-600 p-2 rounded-xl" />
               </span>
-              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent tracking-tight">SocialHup</span>
+              <span className="bg-linear-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent tracking-tight">SocialHup</span>
             </Link>
           </h1>
 
@@ -177,7 +169,7 @@ export default function Navbar() {
             <Link to="/notifications" className="relative w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200">
               <FontAwesomeIcon icon={faBell} className="text-lg" />
               {unreadCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-sm ring-2 ring-white animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]">
+                <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-linear-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-sm ring-2 ring-white animate-pulse">
                   {unreadCount}
                 </span>
               )}

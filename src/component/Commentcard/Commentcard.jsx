@@ -10,7 +10,7 @@ export default function Commentcard({postInfo, commentInfo}) {
         <img 
           src={commentPhoto} 
           alt={commentInfo.commentCreator.name}
-          className='size-9 md:size-10 rounded-xl object-cover ring-2 ring-slate-100 flex-shrink-0 mt-0.5'
+          className='size-9 md:size-10 rounded-xl object-cover ring-2 ring-slate-100 shrink-0 mt-0.5'
         />
         <div className="flex-1">
           <div className="bg-slate-50 hover:bg-slate-100/80 p-3 md:p-4 rounded-2xl rounded-tl-md transition-colors duration-200">

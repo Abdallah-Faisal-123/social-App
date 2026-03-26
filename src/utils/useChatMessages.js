@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from "react";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
-import { db } from "../../src/pages/Chat/firebase";
+import { db } from "../pages/Chat/firebase";
 
 export const useChatMessages = (chatId) => {
   const [messages, setMessages] = useState([]);
@@ -34,16 +34,3 @@ export const useChatMessages = (chatId) => {
 
   return { messages, loadingMessages };
 };
-
-/* 
-export const sendMessage = async (receiverId, text, senderId, imageUrl = null) => {
-    const chatId = [senderId, receiverId].sort().join("_");
-    const msgsRef = collection(db, "chats", chatId, "messages");
-
-    await addDoc(msgsRef, {
-        senderId,
-        text,
-        img: imageUrl, // هنا بنخزن رابط الصورة
-        createdAt: serverTimestamp(),
-    });
-}; */

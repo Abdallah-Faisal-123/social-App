@@ -30,7 +30,7 @@ import {
     faFileAlt
 } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
-import { collection, query, orderBy, limit, getDocs, doc, setDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, getDoc, writeBatch, collectionGroup, where } from 'firebase/firestore';
+import { collection, query, orderBy, limit, getDocs, doc, setDoc, deleteDoc, serverTimestamp, onSnapshot, getDoc, writeBatch, collectionGroup, where } from 'firebase/firestore';
 
 import { saveContact } from '../../utils/useSaveContact';
 import { db } from './firebase';
@@ -124,7 +124,7 @@ export default function Chat() {
     const { token } = useContext(AuthContext);
     const [currentUser, setCurrentUser] = useState(null);
     const [newContact, setNewContact] = useState(false)
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
     const scrollRef = useRef(null);
     const [uploading, setUploading] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
@@ -310,7 +310,7 @@ export default function Chat() {
             localStorage.setItem("savedUsers", JSON.stringify(finalResults))
             window.dispatchEvent(new Event('savedUsersUpdated'));
             setLastUsers(finalResults);
-            setLoading(true)
+            setLoading(false)
         } catch (error) {
             console.error("Error fetching latest users:", error);
         }
@@ -323,7 +323,7 @@ export default function Chat() {
             setLastUsers([]);
         }
         // Turn off loading immediately once local state initializes (especially for new users)
-        setLoading(true);
+        setLoading(false);
     }
     useEffect(() => {
         if (currentUser && token) {
@@ -334,7 +334,7 @@ export default function Chat() {
 
     async function getAllUsers() {
         if (!token || !currentUser) return;
-        setLoading(false)
+        setLoading(true)
 
         setLastUsers([]);
 
@@ -379,7 +379,6 @@ export default function Chat() {
 
             const finalResults = Array.from(uniqueUsersMap.values());
             setLastUsers(finalResults);
-            setLoading(true)
 
         } catch (error) {
             console.error("Error fetching massive users list:", error);
@@ -573,19 +572,7 @@ export default function Chat() {
         return () => unsub();
     }, [selectedUser]);
 
-    // Mark unread messages from the active sender as read
-    useEffect(() => {
-        if (!chatId || !currentUser || messages.length === 0) return;
-        const unreadMsgs = messages.filter(
-            (msg) => msg.senderId !== currentUser.id && msg.read === false
-        );
-        if (unreadMsgs.length > 0) {
-            unreadMsgs.forEach(async (msg) => {
-                const msgRef = doc(db, "chats", chatId, "messages", msg.id);
-                try { await updateDoc(msgRef, { read: true }); } catch (e) { }
-            });
-        }
-    }, [messages, chatId, currentUser]);
+
 
     const filteredUsers = lastUsers.filter(user =>
         user.name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -955,7 +942,7 @@ export default function Chat() {
                                     <button onClick={() => {
                                         getAllUsers();
                                         setNewContact(true);
-                                        setLoading(false)
+                                        setLoading(true)
                                     }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
                                         <FontAwesomeIcon icon={faPlus} />
                                     </button>
@@ -1044,7 +1031,7 @@ export default function Chat() {
                             ))
                         ) : (
                             <>
-                                {loading ? (
+                                {!loading ? (
                                     <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
                                         <p className="text-gray-500 font-medium">No messages found</p>
                                     </div>
