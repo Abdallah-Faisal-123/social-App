@@ -88,9 +88,8 @@ function VoiceMessagePlayer({ src, isMine }) {
             <audio ref={audioRef} src={src} preload="metadata" />
             <button
                 onClick={togglePlay}
-                className={`w-10 h-10 rounded-full border-none flex items-center justify-center text-sm cursor-pointer shrink-0 transition-all duration-150 ease-out active:scale-90 ${
-                    isMine ? 'bg-white/25 text-white backdrop-blur-sm hover:bg-white/35 hover:shadow-[0_2px_12px_rgba(255,255,255,0.15)]' : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-[0_2px_12px_rgba(59,130,246,0.3)]'
-                }`}
+                className={`w-10 h-10 rounded-full border-none flex items-center justify-center text-sm cursor-pointer shrink-0 transition-all duration-150 ease-out active:scale-90 ${isMine ? 'bg-white/25 text-white backdrop-blur-sm hover:bg-white/35 hover:shadow-[0_2px_12px_rgba(255,255,255,0.15)]' : 'bg-blue-500 text-white hover:bg-blue-600 hover:shadow-[0_2px_12px_rgba(59,130,246,0.3)]'
+                    }`}
                 aria-label={playing ? 'Pause' : 'Play'}
             >
                 <FontAwesomeIcon icon={playing ? faPause : faPlay} style={playing ? {} : { marginLeft: 2 }} />
@@ -123,200 +122,200 @@ function VoiceMessagePlayer({ src, isMine }) {
 export default function Chat() {
     const [lastUsers, setLastUsers] = useState([]);
     const { token } = useContext(AuthContext);
-        const [currentUser, setCurrentUser] = useState(null);
-        const [newContact,setNewContact] = useState(false)
-        const [loading, setLoading] = useState(false);
-        const scrollRef = useRef(null);
-        const [uploading, setUploading] = useState(false);     
-        const [isRecording, setIsRecording] = useState(false);
-        const [recordingTime, setRecordingTime] = useState(0);
-        const recordingTimerRef = useRef(null);
-        const mediaRecorderRef = useRef(null);
-        const audioChunksRef = useRef([]);
-        // Reply state
-        const [replyingTo, setReplyingTo] = useState(null);
-        // Delete menu state
-        const [deleteMenuMsg, setDeleteMenuMsg] = useState(null);
-        const [deleteMenuPos, setDeleteMenuPos] = useState({ x: 0, y: 0 });
-        const deleteMenuRef = useRef(null);
-        const longPressTimerRef = useRef(null);
-        const mainSwipeStartX = useRef(null);
-        const [hiddenMsgIds, setHiddenMsgIds] = useState(() => {
-            try { return JSON.parse(localStorage.getItem('hiddenMsgIds') || '[]'); } catch { return []; }
-        });
-        // Contact delete state
-        const [contactToDelete, setContactToDelete] = useState(null);
-        // تعديل تعريف الـ State في بداية الكومبوننت
-const [moreFrnds, setMoreFrnds] = useState(() => {
-    const savedPage = localStorage.getItem("lastPaginationPage");
-    return savedPage ? parseInt(savedPage) : 25; // لو مفيش، ابدأ بـ 25
-});   
-        // Removed the fixed timeout loading so new users don't wait unnecessarily
+    const [currentUser, setCurrentUser] = useState(null);
+    const [newContact, setNewContact] = useState(false)
+    const [loading, setLoading] = useState(false);
+    const scrollRef = useRef(null);
+    const [uploading, setUploading] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingTime, setRecordingTime] = useState(0);
+    const recordingTimerRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+    // Reply state
+    const [replyingTo, setReplyingTo] = useState(null);
+    // Delete menu state
+    const [deleteMenuMsg, setDeleteMenuMsg] = useState(null);
+    const [deleteMenuPos, setDeleteMenuPos] = useState({ x: 0, y: 0 });
+    const deleteMenuRef = useRef(null);
+    const longPressTimerRef = useRef(null);
+    const mainSwipeStartX = useRef(null);
+    const [hiddenMsgIds, setHiddenMsgIds] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('hiddenMsgIds') || '[]'); } catch { return []; }
+    });
+    // Contact delete state
+    const [contactToDelete, setContactToDelete] = useState(null);
+    // تعديل تعريف الـ State في بداية الكومبوننت
+    const [moreFrnds, setMoreFrnds] = useState(() => {
+        const savedPage = localStorage.getItem("lastPaginationPage");
+        return savedPage ? parseInt(savedPage) : 25; // لو مفيش، ابدأ بـ 25
+    });
+    // Removed the fixed timeout loading so new users don't wait unnecessarily
     async function getlatestusers() {
-    if (!token || !currentUser) return;
-    
-    try {
+        if (!token || !currentUser) return;
 
-        const requests = [];
-        for (let i = 1; i <= moreFrnds; i++) {
-            requests.push(
-                axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=50&page=${i}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
-            );
-        }
+        try {
 
-        const responses = await Promise.all(requests);
-        let allPossibleContacts = [];
-        
-        responses.forEach(res => {
-            if (res.data.data.suggestions) {
-                allPossibleContacts = [...allPossibleContacts, ...res.data.data.suggestions];
+            const requests = [];
+            for (let i = 1; i <= moreFrnds; i++) {
+                requests.push(
+                    axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=50&page=${i}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    })
+                );
             }
-        });
 
-        // Also fetch saved contacts directly from Firebase so they are never lost
-        try {
-            const myContactsRef = collection(db, "users", String(currentUser.id), "myContacts");
-            const contactsSnap = await getDocs(myContactsRef);
-            contactsSnap.forEach(docSnap => {
-                const data = docSnap.data();
-                allPossibleContacts.push({
-                    _id: data.userId,
-                    name: data.username,
-                    photo: data.photo,
-                    chatId: data.chatId
-                });
+            const responses = await Promise.all(requests);
+            let allPossibleContacts = [];
+
+            responses.forEach(res => {
+                if (res.data.data.suggestions) {
+                    allPossibleContacts = [...allPossibleContacts, ...res.data.data.suggestions];
+                }
             });
-        } catch (err) {
-            console.error("Error fetching myContacts:", err);
-        }
 
-        const uniqueMap = new Map();
-        allPossibleContacts.forEach(u => {
-            if (u && u._id !== currentUser.id) uniqueMap.set(u._id, u);
-        });
+            // Also fetch saved contacts directly from Firebase so they are never lost
+            try {
+                const myContactsRef = collection(db, "users", String(currentUser.id), "myContacts");
+                const contactsSnap = await getDocs(myContactsRef);
+                contactsSnap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    allPossibleContacts.push({
+                        _id: data.userId,
+                        name: data.username,
+                        photo: data.photo,
+                        chatId: data.chatId
+                    });
+                });
+            } catch (err) {
+                console.error("Error fetching myContacts:", err);
+            }
 
-        // Absolute Safety Net: Aggressively scan ALL messages directly from Firebase
-        // This finds 'phantom' old chats where the contact doesn't exist in the API paginations at all!
-        try {
-            const allMsgsSnap = await getDocs(collectionGroup(db, 'messages'));
-            const shadowPromises = [];
-            
-            allMsgsSnap.forEach(docSnap => {
-                const parentPath = docSnap.ref.parent.parent?.id; // 'user1_user2'
-                if (parentPath && parentPath.includes(String(currentUser.id))) {
-                    const parts = parentPath.split('_');
-                    if (parts.length === 2) {
-                        const otherId = parts[0] === String(currentUser.id) ? parts[1] : parts[0];
-                        if (otherId && !uniqueMap.has(otherId)) {
-                            const msgData = docSnap.data();
-                            // If they are missing, attempt to extract their real API profile by checking their posts!
-                            let suspectedName = msgData.replyTo?.senderName || "Contact";
-                            let suspectedPhoto = "https://api.dicebear.com/7.x/avataaars/svg?seed=" + otherId;
-                            
-                            // Immediately mark to prevent processing duplicate messages for this same hidden user
-                            uniqueMap.set(otherId, { _id: otherId });
-                            
-                            shadowPromises.push((async () => {
-                                try {
-                                    const pfCheck = await axios.get(`https://route-posts.routemisr.com/users/${otherId}/posts`, {
-                                        headers: { Authorization: `Bearer ${token}` }
-                                    });
-                                    if (pfCheck.data?.data?.posts?.length > 0) {
-                                        const extUser = pfCheck.data.data.posts[0].user;
-                                        if (extUser) {
-                                            suspectedName = extUser.name || suspectedName;
-                                            suspectedPhoto = extUser.photo || suspectedPhoto;
-                                        }
-                                    } else {
-                                        throw new Error("Force deep search");
-                                    }
-                                } catch(e) {
-                                    // Silent failure on posts. Aggressively search up to 50 depth pages of the suggestions API!
-                                    for (let searchPage = 1; searchPage <= 50; searchPage++) {
-                                        try {
-                                            const pgRes = await axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=100&page=${searchPage}`, {
-                                                headers: { Authorization: `Bearer ${token}` }
-                                            });
-                                            const candidates = pgRes.data?.data?.suggestions || [];
-                                            const match = candidates.find(c => c._id === otherId);
-                                            if (match) {
-                                                suspectedName = match.name;
-                                                suspectedPhoto = match.photo;
-                                                break;
+            const uniqueMap = new Map();
+            allPossibleContacts.forEach(u => {
+                if (u && u._id !== currentUser.id) uniqueMap.set(u._id, u);
+            });
+
+            // Absolute Safety Net: Aggressively scan ALL messages directly from Firebase
+            // This finds 'phantom' old chats where the contact doesn't exist in the API paginations at all!
+            try {
+                const allMsgsSnap = await getDocs(collectionGroup(db, 'messages'));
+                const shadowPromises = [];
+
+                allMsgsSnap.forEach(docSnap => {
+                    const parentPath = docSnap.ref.parent.parent?.id; // 'user1_user2'
+                    if (parentPath && parentPath.includes(String(currentUser.id))) {
+                        const parts = parentPath.split('_');
+                        if (parts.length === 2) {
+                            const otherId = parts[0] === String(currentUser.id) ? parts[1] : parts[0];
+                            if (otherId && !uniqueMap.has(otherId)) {
+                                const msgData = docSnap.data();
+                                // If they are missing, attempt to extract their real API profile by checking their posts!
+                                let suspectedName = msgData.replyTo?.senderName || "Contact";
+                                let suspectedPhoto = "https://api.dicebear.com/7.x/avataaars/svg?seed=" + otherId;
+
+                                // Immediately mark to prevent processing duplicate messages for this same hidden user
+                                uniqueMap.set(otherId, { _id: otherId });
+
+                                shadowPromises.push((async () => {
+                                    try {
+                                        const pfCheck = await axios.get(`https://route-posts.routemisr.com/users/${otherId}/posts`, {
+                                            headers: { Authorization: `Bearer ${token}` }
+                                        });
+                                        if (pfCheck.data?.data?.posts?.length > 0) {
+                                            const extUser = pfCheck.data.data.posts[0].user;
+                                            if (extUser) {
+                                                suspectedName = extUser.name || suspectedName;
+                                                suspectedPhoto = extUser.photo || suspectedPhoto;
                                             }
-                                            if (candidates.length === 0) break; // Exhausted API
-                                        } catch (pgErr) { break; }
+                                        } else {
+                                            throw new Error("Force deep search");
+                                        }
+                                    } catch (e) {
+                                        // Silent failure on posts. Aggressively search up to 50 depth pages of the suggestions API!
+                                        for (let searchPage = 1; searchPage <= 50; searchPage++) {
+                                            try {
+                                                const pgRes = await axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=100&page=${searchPage}`, {
+                                                    headers: { Authorization: `Bearer ${token}` }
+                                                });
+                                                const candidates = pgRes.data?.data?.suggestions || [];
+                                                const match = candidates.find(c => c._id === otherId);
+                                                if (match) {
+                                                    suspectedName = match.name;
+                                                    suspectedPhoto = match.photo;
+                                                    break;
+                                                }
+                                                if (candidates.length === 0) break; // Exhausted API
+                                            } catch (pgErr) { break; }
+                                        }
                                     }
-                                }
 
-                                uniqueMap.set(otherId, {
-                                    _id: otherId,
-                                    name: suspectedName,
-                                    photo: suspectedPhoto,
-                                    chatId: parentPath
-                                });
-                            })());
+                                    uniqueMap.set(otherId, {
+                                        _id: otherId,
+                                        name: suspectedName,
+                                        photo: suspectedPhoto,
+                                        chatId: parentPath
+                                    });
+                                })());
+                            }
                         }
                     }
+                });
+
+                if (shadowPromises.length > 0) {
+                    await Promise.all(shadowPromises);
                 }
-            });
-            
-            if (shadowPromises.length > 0) {
-                await Promise.all(shadowPromises);
+            } catch (err) {
+                console.error("Error spanning collectionGroup for shadow contacts:", err);
             }
-        } catch (err) {
-            console.error("Error spanning collectionGroup for shadow contacts:", err);
+
+            const usersArray = Array.from(uniqueMap.values());
+
+            const updatedUsers = await Promise.all(usersArray.map(async (user) => {
+                const chatId = [currentUser.id, user._id].sort().join("_");
+                const msgsRef = collection(db, "chats", chatId, "messages");
+                const q = query(msgsRef, orderBy("createdAt", "desc"), limit(1));
+
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    const statusRef = doc(db, "userStatus", user._id);
+                    const statusSnap = await getDoc(statusRef);
+                    const online = statusSnap.exists() ? statusSnap.data().online : false;
+                    const lastDoc = querySnapshot.docs[0].data();
+
+                    let msgContent = lastDoc.text;
+                    if (!msgContent) {
+                        if (lastDoc.img) msgContent = "Photo 📷";
+                        else if (lastDoc.audio) msgContent = "Audio 🎵";
+                        else if (lastDoc.video) msgContent = "Video 🎥";
+                        else if (lastDoc.file) msgContent = "File 📎";
+                    }
+
+                    return {
+                        ...user,
+                        online,
+                        lastMsg: msgContent || "",
+                        rawTime: lastDoc.createdAt?.seconds || 0,
+                        time: lastDoc.createdAt?.seconds
+                            ? new Date(lastDoc.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : ""
+                    };
+                }
+                return null;
+            }));
+
+            const finalResults = updatedUsers.filter(u => u !== null).sort((a, b) => b.rawTime - a.rawTime)
+
+            localStorage.setItem("savedUsers", JSON.stringify(finalResults))
+            window.dispatchEvent(new Event('savedUsersUpdated'));
+            setLastUsers(finalResults);
+            setLoading(true)
+        } catch (error) {
+            console.error("Error fetching latest users:", error);
         }
-
-        const usersArray = Array.from(uniqueMap.values());
-
-        const updatedUsers = await Promise.all(usersArray.map(async (user) => {
-            const chatId = [currentUser.id, user._id].sort().join("_");
-            const msgsRef = collection(db, "chats", chatId, "messages");
-            const q = query(msgsRef, orderBy("createdAt", "desc"), limit(1));
-
-            const querySnapshot = await getDocs(q);
-            
-            if (!querySnapshot.empty) {
-                const statusRef = doc(db, "userStatus", user._id);
-                const statusSnap = await getDoc(statusRef);
-                const online = statusSnap.exists() ? statusSnap.data().online : false;
-                const lastDoc = querySnapshot.docs[0].data();
-                
-                let msgContent = lastDoc.text;
-                if (!msgContent) {
-                    if (lastDoc.img) msgContent = "Photo 📷";
-                    else if (lastDoc.audio) msgContent = "Audio 🎵";
-                    else if (lastDoc.video) msgContent = "Video 🎥";
-                    else if (lastDoc.file) msgContent = "File 📎";
-                }
-
-                return {
-                    ...user,
-                    online,
-                    lastMsg: msgContent || "",
-                   rawTime: lastDoc.createdAt?.seconds || 0,
-                    time: lastDoc.createdAt?.seconds
-                        ? new Date(lastDoc.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : ""
-                };
-            }
-            return null; 
-        }));
-
-        const finalResults = updatedUsers.filter(u=>u !== null).sort((a,b)=> b.rawTime - a.rawTime)
-         
-        localStorage.setItem("savedUsers",JSON.stringify(finalResults))
-        window.dispatchEvent(new Event('savedUsersUpdated'));
-        setLastUsers(finalResults);
-        setLoading(true)  
-    } catch (error) {
-        console.error("Error fetching latest users:", error);
     }
-}
-function getSavedUsers(){
+    function getSavedUsers() {
         const saved = localStorage.getItem("savedUsers")
         if (saved) {
             setLastUsers(JSON.parse(saved));
@@ -325,79 +324,81 @@ function getSavedUsers(){
         }
         // Turn off loading immediately once local state initializes (especially for new users)
         setLoading(true);
-}
-useEffect(() => {
-    if (currentUser && token) {
-        getSavedUsers()
-        getlatestusers();
     }
-}, [token, currentUser]);
-       
-     async function getAllUsers() {
-    if (!token || !currentUser) return;
-    setLoading(false)
-
-    setLastUsers([]); 
-
-    try {
-        let allUsersAccumulator = [];
-        const totalPagesToFetch = moreFrnds;
-  
-        const requests = [];
-        for (let i = 1; i <= totalPagesToFetch; i++) {
-        
-            requests.push(
-                axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=50&page=${i}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                })
-            );
-            
-        
+    useEffect(() => {
+        if (currentUser && token) {
+            getSavedUsers()
+            getlatestusers();
         }
+    }, [token, currentUser]);
 
-        
-        const responses = await Promise.all(requests);
-        
-        
-        responses.forEach(response => {
-            const pageUsers = response.data.data.suggestions;
-            if (pageUsers) {
-                allUsersAccumulator = [...allUsersAccumulator, ...pageUsers];
-            }
-        });
-
-        
-        const uniqueUsersMap = new Map();
-        allUsersAccumulator.forEach(user => {
-            if (user && user._id !== currentUser.id && !uniqueUsersMap.has(user._id)) {
-                uniqueUsersMap.set(user._id, {
-                    ...user,
-                    lastMsg: 'Tap to start chatting', 
-                    time: ''
-                });
-            }
-        });
-
-        const finalResults = Array.from(uniqueUsersMap.values());
-        setLastUsers(finalResults);
-        setLoading(true)
-
-    } catch (error) {
-        console.error("Error fetching massive users list:", error);
-        
-    } finally{
+    async function getAllUsers() {
+        if (!token || !currentUser) return;
         setLoading(false)
+
+        setLastUsers([]);
+
+        try {
+            let allUsersAccumulator = [];
+            const totalPagesToFetch = moreFrnds;
+
+            const requests = [];
+            for (let i = 1; i <= totalPagesToFetch; i++) {
+
+                requests.push(
+                    axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=50&page=${i}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    })
+                );
+
+
+            }
+
+
+            const responses = await Promise.all(requests);
+
+
+            responses.forEach(response => {
+                const pageUsers = response.data.data.suggestions;
+                if (pageUsers) {
+                    allUsersAccumulator = [...allUsersAccumulator, ...pageUsers];
+                }
+            });
+
+
+            const uniqueUsersMap = new Map();
+            allUsersAccumulator.forEach(user => {
+                if (user && user._id !== currentUser.id && !uniqueUsersMap.has(user._id)) {
+                    uniqueUsersMap.set(user._id, {
+                        ...user,
+                        lastMsg: 'Tap to start chatting',
+                        time: ''
+                    });
+                }
+            });
+
+            const finalResults = Array.from(uniqueUsersMap.values());
+            setLastUsers(finalResults);
+            setLoading(true)
+
+        } catch (error) {
+            console.error("Error fetching massive users list:", error);
+
+        } finally {
+            setLoading(false)
+        }
     }
-}
     useEffect(() => {
         const fetchUserProfile = async () => {
             if (!token) return;
             try {
                 const { data } = await axios.get(
                     "https://route-posts.routemisr.com/users/profile-data",
-                    {  headers:{
-                        Authorization: `Bearer ${token}`
-                        } }
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`
+                        }
+                    }
                 );
                 if (data.data.user) {
                     setCurrentUser({
@@ -451,11 +452,18 @@ useEffect(() => {
         return () => unsubscribers.forEach(u => u());
     }, [currentUser?.id, lastUsers]);
 
+    // Push the total chat unread count to a global parameter for Navbar to read
+    useEffect(() => {
+        const total = Object.values(unreadCountMap).reduce((acc, curr) => acc + curr, 0);
+        localStorage.setItem('chatUnreadCount_param', total.toString());
+        window.dispatchEvent(new Event('chatUnreadStateChanged'));
+    }, [unreadCountMap]);
+
     // Check URL parameters for direct chat link (e.g., from notifications)
     useEffect(() => {
         const targetUserId = searchParams.get("user");
         if (!targetUserId || !currentUser || !token || !lastUsers) return;
-        
+
         // If they are already selected, we don't need to do anything
         if (selectedUser && String(selectedUser._id) === targetUserId) return;
 
@@ -481,7 +489,7 @@ useEffect(() => {
                         searchParams.delete("user");
                         setSearchParams(searchParams, { replace: true });
                     }
-                } catch(err) {
+                } catch (err) {
                     console.error("Failed fetching external user for chat:", err);
                 }
             }
@@ -540,10 +548,10 @@ useEffect(() => {
         if (!currentUser?.id) return;
         const userStatusRef = doc(db, "userStatus", currentUser.id);
         const setOnlineStatus = async (isOnline) => {
-            try { await setDoc(userStatusRef, { online: isOnline, lastSeen: serverTimestamp() }, { merge: true }); } catch (e) {}
+            try { await setDoc(userStatusRef, { online: isOnline, lastSeen: serverTimestamp() }, { merge: true }); } catch (e) { }
         };
         setOnlineStatus(true);
-        
+
         const handleBeforeUnload = () => { setOnlineStatus(false); };
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => {
@@ -574,7 +582,7 @@ useEffect(() => {
         if (unreadMsgs.length > 0) {
             unreadMsgs.forEach(async (msg) => {
                 const msgRef = doc(db, "chats", chatId, "messages", msg.id);
-                try { await updateDoc(msgRef, { read: true }); } catch (e) {}
+                try { await updateDoc(msgRef, { read: true }); } catch (e) { }
             });
         }
     }, [messages, chatId, currentUser]);
@@ -583,334 +591,334 @@ useEffect(() => {
         user.name?.toLowerCase().includes(searchTerm.toLowerCase())
     );
     useEffect(() => {
-    if (scrollRef.current) {
-        scrollRef.current.scrollTo({
-            top: scrollRef.current.scrollHeight,
-            behavior: 'smooth'
-        });
-    }
-}, [messages]);
-
-const handleSend = async () => {
-    // ... كود التحقق (Validation)
-    try {
-        await sendMessage(selectedUser._id, text, currentUser.id, null, null, replyingTo);
-        setReplyingTo(null);
-        
-        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
-        setLastUsers(prevUsers => {
-            const updated = prevUsers.map(user => 
-                user._id === selectedUser._id 
-                ? { ...user, lastMsg: text, time: now, rawTime: Date.now() / 1000 } 
-                : user
-            );
-            // احفظ التحديث الجديد في الـ Local Storage فوراً
-            localStorage.setItem("savedUsers", JSON.stringify(updated));
-            window.dispatchEvent(new Event('savedUsersUpdated'));
-            return updated;
-        });
-
-        // Ensure we pass the current user object so myContacts can save both profiles accurately
-        await saveContact(currentUser.id, currentUser, selectedUser, chatId);
-        setText("");
-    } catch (error) {
-        console.error(error);
-    }
-};
-
-
-
-const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", "images");
-
-    setUploading(true);
-    try {
-        const res = await axios.post(
-            "https://api.cloudinary.com/v1_1/dvzdfcwfa/auto/upload",
-            formData
-        );
-        const downloadURL = res.data.secure_url;
-
-        let imgUrl = null, audioUrl = null, videoUrl = null, fileUrl = null;
-        let msgTypeStr = "File 📎";
-
-        if (file.type.startsWith('image/')) {
-            imgUrl = downloadURL;
-            msgTypeStr = "Photo 📷";
-        } else if (file.type.startsWith('audio/')) {
-            audioUrl = downloadURL;
-            msgTypeStr = "Audio 🎵";
-        } else if (file.type.startsWith('video/')) {
-            videoUrl = downloadURL;
-            msgTypeStr = "Video 🎥";
-        } else {
-            fileUrl = downloadURL;
+        if (scrollRef.current) {
+            scrollRef.current.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
         }
+    }, [messages]);
 
-        await sendMessage(selectedUser._id, "", currentUser.id, imgUrl, audioUrl, replyingTo, videoUrl, fileUrl);
-        setReplyingTo(null);
-        
-        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setLastUsers(prev => {
-            const updated = prev.map(u => 
-                u._id === selectedUser._id ? { ...u, lastMsg: msgTypeStr, time: now, rawTime: Date.now() / 1000 } : u
+    const handleSend = async () => {
+        // ... كود التحقق (Validation)
+        try {
+            await sendMessage(selectedUser._id, text, currentUser.id, null, null, replyingTo);
+            setReplyingTo(null);
+
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            setLastUsers(prevUsers => {
+                const updated = prevUsers.map(user =>
+                    user._id === selectedUser._id
+                        ? { ...user, lastMsg: text, time: now, rawTime: Date.now() / 1000 }
+                        : user
+                );
+                // احفظ التحديث الجديد في الـ Local Storage فوراً
+                localStorage.setItem("savedUsers", JSON.stringify(updated));
+                window.dispatchEvent(new Event('savedUsersUpdated'));
+                return updated;
+            });
+
+            // Ensure we pass the current user object so myContacts can save both profiles accurately
+            await saveContact(currentUser.id, currentUser, selectedUser, chatId);
+            setText("");
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", "images");
+
+        setUploading(true);
+        try {
+            const res = await axios.post(
+                "https://api.cloudinary.com/v1_1/dvzdfcwfa/auto/upload",
+                formData
             );
-            localStorage.setItem("savedUsers", JSON.stringify(updated));
-            window.dispatchEvent(new Event('savedUsersUpdated'));
-            return updated;
-        });
-        
-        // Ensure we pass the current user object so myContacts can save both profiles accurately
-        await saveContact(currentUser.id, currentUser, selectedUser, chatId);
-    } catch (err) {
-        console.error("Cloudinary Error:", err);
-    } finally {
-        setUploading(false);
-    }
-};
+            const downloadURL = res.data.secure_url;
 
-const startRecording = async () => {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
-        audioChunksRef.current = [];
+            let imgUrl = null, audioUrl = null, videoUrl = null, fileUrl = null;
+            let msgTypeStr = "File 📎";
 
-        mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                audioChunksRef.current.push(event.data);
+            if (file.type.startsWith('image/')) {
+                imgUrl = downloadURL;
+                msgTypeStr = "Photo 📷";
+            } else if (file.type.startsWith('audio/')) {
+                audioUrl = downloadURL;
+                msgTypeStr = "Audio 🎵";
+            } else if (file.type.startsWith('video/')) {
+                videoUrl = downloadURL;
+                msgTypeStr = "Video 🎥";
+            } else {
+                fileUrl = downloadURL;
+            }
+
+            await sendMessage(selectedUser._id, "", currentUser.id, imgUrl, audioUrl, replyingTo, videoUrl, fileUrl);
+            setReplyingTo(null);
+
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            setLastUsers(prev => {
+                const updated = prev.map(u =>
+                    u._id === selectedUser._id ? { ...u, lastMsg: msgTypeStr, time: now, rawTime: Date.now() / 1000 } : u
+                );
+                localStorage.setItem("savedUsers", JSON.stringify(updated));
+                window.dispatchEvent(new Event('savedUsersUpdated'));
+                return updated;
+            });
+
+            // Ensure we pass the current user object so myContacts can save both profiles accurately
+            await saveContact(currentUser.id, currentUser, selectedUser, chatId);
+        } catch (err) {
+            console.error("Cloudinary Error:", err);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                const audioFile = new File([audioBlob], 'voice_message.webm', { type: 'audio/webm' });
+                uploadAudioFile(audioFile);
+
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setRecordingTime(0);
+            recordingTimerRef.current = setInterval(() => {
+                setRecordingTime(prev => prev + 1);
+            }, 1000);
+        } catch (err) {
+            console.error("Microphone access error:", err);
+            alert("Could not access microphone. Please check permissions!");
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            clearInterval(recordingTimerRef.current);
+            setRecordingTime(0);
+        }
+    };
+
+    const cancelRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.ondataavailable = null;
+            mediaRecorderRef.current.onstop = null;
+            mediaRecorderRef.current.stop();
+            mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+            setIsRecording(false);
+            clearInterval(recordingTimerRef.current);
+            setRecordingTime(0);
+        }
+    };
+
+    const formatRecTime = (s) => {
+        const m = Math.floor(s / 60).toString().padStart(2, '0');
+        const sec = (s % 60).toString().padStart(2, '0');
+        return `${m}:${sec}`;
+    };
+
+    const uploadAudioFile = async (file) => {
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("upload_preset", "images");
+
+        setUploading(true);
+        try {
+            const res = await axios.post(
+                "https://api.cloudinary.com/v1_1/dvzdfcwfa/video/upload",
+                formData
+            );
+            const downloadURL = res.data.secure_url;
+
+            await sendMessage(selectedUser._id, "", currentUser.id, null, downloadURL, replyingTo);
+            setReplyingTo(null);
+
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            setLastUsers(prev => {
+                const updated = prev.map(u =>
+                    u._id === selectedUser._id ? { ...u, lastMsg: "Voice message 🎤", time: now, rawTime: Date.now() / 1000 } : u
+                );
+                localStorage.setItem("savedUsers", JSON.stringify(updated));
+                window.dispatchEvent(new Event('savedUsersUpdated'));
+                return updated;
+            });
+
+            // Ensure we pass the current user object so myContacts can save both profiles accurately
+            await saveContact(currentUser.id, currentUser, selectedUser, chatId);
+        } catch (err) {
+            console.error("Cloudinary Audio Error:", err);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    // ── Close delete menu on outside click ──
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (deleteMenuRef.current && !deleteMenuRef.current.contains(e.target)) {
+                setDeleteMenuMsg(null);
             }
         };
-
-        mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            const audioFile = new File([audioBlob], 'voice_message.webm', { type: 'audio/webm' });
-            uploadAudioFile(audioFile);
-            
-            stream.getTracks().forEach(track => track.stop());
+        if (deleteMenuMsg) {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('touchstart', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('touchstart', handleClickOutside);
         };
+    }, [deleteMenuMsg]);
 
-        mediaRecorder.start();
-        setIsRecording(true);
-        setRecordingTime(0);
-        recordingTimerRef.current = setInterval(() => {
-            setRecordingTime(prev => prev + 1);
-        }, 1000);
-    } catch (err) {
-        console.error("Microphone access error:", err);
-        alert("Could not access microphone. Please check permissions!");
-    }
-};
-
-const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.stop();
-        setIsRecording(false);
-        clearInterval(recordingTimerRef.current);
-        setRecordingTime(0);
-    }
-};
-
-const cancelRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-        mediaRecorderRef.current.ondataavailable = null;
-        mediaRecorderRef.current.onstop = null;
-        mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
-        setIsRecording(false);
-        clearInterval(recordingTimerRef.current);
-        setRecordingTime(0);
-    }
-};
-
-const formatRecTime = (s) => {
-    const m = Math.floor(s / 60).toString().padStart(2, '0');
-    const sec = (s % 60).toString().padStart(2, '0');
-    return `${m}:${sec}`;
-};
-
-const uploadAudioFile = async (file) => {
-    if (!file) return;
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", "images"); 
-
-    setUploading(true);
-    try {
-        const res = await axios.post(
-            "https://api.cloudinary.com/v1_1/dvzdfcwfa/video/upload", 
-            formData
-        );
-        const downloadURL = res.data.secure_url;
-
-        await sendMessage(selectedUser._id, "", currentUser.id, null, downloadURL, replyingTo);
-        setReplyingTo(null);
-        
-        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setLastUsers(prev => {
-            const updated = prev.map(u => 
-                u._id === selectedUser._id ? { ...u, lastMsg: "Voice message 🎤", time: now, rawTime: Date.now() / 1000 } : u
-            );
-            localStorage.setItem("savedUsers", JSON.stringify(updated));
-            window.dispatchEvent(new Event('savedUsersUpdated'));
-            return updated;
+    // ── Open delete context menu ──
+    const openDeleteMenu = (e, message) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const isMine = message.senderId === currentUser?.id;
+        setDeleteMenuPos({
+            x: isMine ? rect.left : rect.right - 200,
+            y: rect.top - 10
         });
-
-        // Ensure we pass the current user object so myContacts can save both profiles accurately
-        await saveContact(currentUser.id, currentUser, selectedUser, chatId);
-    } catch (err) {
-        console.error("Cloudinary Audio Error:", err);
-    } finally {
-        setUploading(false);
-    }
-};
-
-// ── Close delete menu on outside click ──
-useEffect(() => {
-    const handleClickOutside = (e) => {
-        if (deleteMenuRef.current && !deleteMenuRef.current.contains(e.target)) {
-            setDeleteMenuMsg(null);
-        }
-    };
-    if (deleteMenuMsg) {
-        document.addEventListener('mousedown', handleClickOutside);
-        document.addEventListener('touchstart', handleClickOutside);
-    }
-    return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-        document.removeEventListener('touchstart', handleClickOutside);
-    };
-}, [deleteMenuMsg]);
-
-// ── Open delete context menu ──
-const openDeleteMenu = (e, message) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const isMine = message.senderId === currentUser?.id;
-    setDeleteMenuPos({
-        x: isMine ? rect.left : rect.right - 200,
-        y: rect.top - 10
-    });
-    setDeleteMenuMsg(message);
-};
-
-// Long press handlers for mobile
-const handleTouchStart = (e, message) => {
-    longPressTimerRef.current = setTimeout(() => {
-        const touch = e.touches[0];
-        const fakeEvent = { preventDefault: () => {}, stopPropagation: () => {}, currentTarget: e.currentTarget, clientX: touch.clientX, clientY: touch.clientY };
-        // Use touch position directly
-        setDeleteMenuPos({ x: touch.clientX - 100, y: touch.clientY - 80 });
         setDeleteMenuMsg(message);
-    }, 500);
-};
+    };
 
-const handleTouchEnd = () => {
-    clearTimeout(longPressTimerRef.current);
-};
+    // Long press handlers for mobile
+    const handleTouchStart = (e, message) => {
+        longPressTimerRef.current = setTimeout(() => {
+            const touch = e.touches[0];
+            const fakeEvent = { preventDefault: () => { }, stopPropagation: () => { }, currentTarget: e.currentTarget, clientX: touch.clientX, clientY: touch.clientY };
+            // Use touch position directly
+            setDeleteMenuPos({ x: touch.clientX - 100, y: touch.clientY - 80 });
+            setDeleteMenuMsg(message);
+        }, 500);
+    };
 
-// ── Main Chat Swipe Handlers ──
-const handleMainTouchStart = (e) => {
-    // Only register one touch to avoid pinch gestures
-    if (e.touches.length === 1) {
-        mainSwipeStartX.current = e.touches[0].clientX;
-    }
-};
+    const handleTouchEnd = () => {
+        clearTimeout(longPressTimerRef.current);
+    };
 
-const handleMainTouchEnd = (e) => {
-    if (mainSwipeStartX.current === null) return;
-    const endX = e.changedTouches[0].clientX;
-    const diffX = endX - mainSwipeStartX.current;
-    
-    // Swipe Right -> Open Sidebar (like swiping back)
-    // You only want this active on mobile views (< 1024)
-    if (diffX > 75 && window.innerWidth < 1024) {
-        setMobileSidebarOpen(true);
-    }
-    
-    mainSwipeStartX.current = null;
-};
-
-// ── Delete for everyone (removes from Firebase) ──
-const deleteForEveryone = async (message) => {
-    if (!chatId || !message?.id) return;
-    try {
-        const msgRef = doc(db, 'chats', chatId, 'messages', message.id);
-        await deleteDoc(msgRef);
-        setDeleteMenuMsg(null);
-    } catch (err) {
-        console.error('Delete for everyone failed:', err);
-    }
-};
-
-// ── Delete for me (hides locally) ──
-const deleteForMe = (message) => {
-    if (!message?.id) return;
-    const updated = [...hiddenMsgIds, message.id];
-    setHiddenMsgIds(updated);
-    localStorage.setItem('hiddenMsgIds', JSON.stringify(updated));
-    setDeleteMenuMsg(null);
-};
-
-// Filter hidden messages
-const visibleMessages = messages.filter(m => !hiddenMsgIds.includes(m.id));
-
-// ── Handle reply ──
-const handleReply = (message) => {
-    setReplyingTo({
-        id: message.id,
-        text: message.text || (message.img ? 'Photo 📷' : (message.audio ? 'Voice message 🎤' : 'Message')),
-        senderId: message.senderId,
-        senderName: message.senderId === currentUser?.id ? 'You' : selectedUser?.name
-    });
-    setDeleteMenuMsg(null);
-    // Auto focus the input after a short delay
-    setTimeout(() => {
-        const input = document.getElementById('chat-text-input');
-        if (input) input.focus();
-    }, 50);
-};
-
-// ── Delete contact ──
-const handleDeleteContact = async (user) => {
-    if (!user?._id || !currentUser?.id) return;
-    try {
-        const cId = [currentUser.id, user._id].sort().join("_");
-
-        // Delete all messages in the chat
-        const msgsRef = collection(db, "chats", cId, "messages");
-        const msgsSnap = await getDocs(msgsRef);
-        const batch = writeBatch(db);
-        msgsSnap.docs.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-
-        // Remove from local state
-        const updated = lastUsers.filter(u => u._id !== user._id);
-        setLastUsers(updated);
-        localStorage.setItem('savedUsers', JSON.stringify(updated));
-        window.dispatchEvent(new Event('savedUsersUpdated'));
-
-        // If this was the selected user, deselect
-        if (selectedUser?._id === user._id) {
-            setSelectedUser(null);
-            if (window.innerWidth < 1024) setMobileSidebarOpen(true);
+    // ── Main Chat Swipe Handlers ──
+    const handleMainTouchStart = (e) => {
+        // Only register one touch to avoid pinch gestures
+        if (e.touches.length === 1) {
+            mainSwipeStartX.current = e.touches[0].clientX;
         }
-    } catch (err) {
-        console.error('Delete contact failed:', err);
-    } finally {
-        setContactToDelete(null);
-    }
-};
+    };
 
-   return (
+    const handleMainTouchEnd = (e) => {
+        if (mainSwipeStartX.current === null) return;
+        const endX = e.changedTouches[0].clientX;
+        const diffX = endX - mainSwipeStartX.current;
+
+        // Swipe Right -> Open Sidebar (like swiping back)
+        // You only want this active on mobile views (< 1024)
+        if (diffX > 75 && window.innerWidth < 1024) {
+            setMobileSidebarOpen(true);
+        }
+
+        mainSwipeStartX.current = null;
+    };
+
+    // ── Delete for everyone (removes from Firebase) ──
+    const deleteForEveryone = async (message) => {
+        if (!chatId || !message?.id) return;
+        try {
+            const msgRef = doc(db, 'chats', chatId, 'messages', message.id);
+            await deleteDoc(msgRef);
+            setDeleteMenuMsg(null);
+        } catch (err) {
+            console.error('Delete for everyone failed:', err);
+        }
+    };
+
+    // ── Delete for me (hides locally) ──
+    const deleteForMe = (message) => {
+        if (!message?.id) return;
+        const updated = [...hiddenMsgIds, message.id];
+        setHiddenMsgIds(updated);
+        localStorage.setItem('hiddenMsgIds', JSON.stringify(updated));
+        setDeleteMenuMsg(null);
+    };
+
+    // Filter hidden messages
+    const visibleMessages = messages.filter(m => !hiddenMsgIds.includes(m.id));
+
+    // ── Handle reply ──
+    const handleReply = (message) => {
+        setReplyingTo({
+            id: message.id,
+            text: message.text || (message.img ? 'Photo 📷' : (message.audio ? 'Voice message 🎤' : 'Message')),
+            senderId: message.senderId,
+            senderName: message.senderId === currentUser?.id ? 'You' : selectedUser?.name
+        });
+        setDeleteMenuMsg(null);
+        // Auto focus the input after a short delay
+        setTimeout(() => {
+            const input = document.getElementById('chat-text-input');
+            if (input) input.focus();
+        }, 50);
+    };
+
+    // ── Delete contact ──
+    const handleDeleteContact = async (user) => {
+        if (!user?._id || !currentUser?.id) return;
+        try {
+            const cId = [currentUser.id, user._id].sort().join("_");
+
+            // Delete all messages in the chat
+            const msgsRef = collection(db, "chats", cId, "messages");
+            const msgsSnap = await getDocs(msgsRef);
+            const batch = writeBatch(db);
+            msgsSnap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+
+            // Remove from local state
+            const updated = lastUsers.filter(u => u._id !== user._id);
+            setLastUsers(updated);
+            localStorage.setItem('savedUsers', JSON.stringify(updated));
+            window.dispatchEvent(new Event('savedUsersUpdated'));
+
+            // If this was the selected user, deselect
+            if (selectedUser?._id === user._id) {
+                setSelectedUser(null);
+                if (window.innerWidth < 1024) setMobileSidebarOpen(true);
+            }
+        } catch (err) {
+            console.error('Delete contact failed:', err);
+        } finally {
+            setContactToDelete(null);
+        }
+    };
+
+    return (
         <div className="flex h-screen bg-white overflow-hidden font-['Inter',sans-serif]">
             {/* Sidebar - Modern List */}
             <aside
@@ -923,38 +931,38 @@ const handleDeleteContact = async (user) => {
                         <div className="flex items-center justify-between mb-8">
                             <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Messages</h1>
                             {newContact ? (
-                               <>
-                                <button onClick={() => {
-                                    setLastUsers([]);
-                                    getlatestusers();
-                                    getSavedUsers()
-                                    setNewContact(false);
-                                }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
-                                    <FontAwesomeIcon icon={faArrowAltCircleLeft} />
-                                </button>
-                                   
-                                <button onClick={() => {
-                                    const nextBatch = moreFrnds + 1;
-                                    setMoreFrnds(nextBatch);
-                                    localStorage.setItem("lastPaginationPage", nextBatch.toString());
-                                    getAllUsers();
-                                }} className="w-11 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
-                                  more   
-                                </button>                                
+                                <>
+                                    <button onClick={() => {
+                                        setLastUsers([]);
+                                        getlatestusers();
+                                        getSavedUsers()
+                                        setNewContact(false);
+                                    }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
+                                        <FontAwesomeIcon icon={faArrowAltCircleLeft} />
+                                    </button>
+
+                                    <button onClick={() => {
+                                        const nextBatch = moreFrnds + 1;
+                                        setMoreFrnds(nextBatch);
+                                        localStorage.setItem("lastPaginationPage", nextBatch.toString());
+                                        getAllUsers();
+                                    }} className="w-11 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
+                                        more
+                                    </button>
                                 </>
                             ) : (
                                 <>
-                                <button onClick={() => {
-                                    getAllUsers();
-                                    setNewContact(true);
-                                    setLoading(false)
-                                }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
-                                    <FontAwesomeIcon icon={faPlus} />
-                                </button>
+                                    <button onClick={() => {
+                                        getAllUsers();
+                                        setNewContact(true);
+                                        setLoading(false)
+                                    }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
+                                        <FontAwesomeIcon icon={faPlus} />
+                                    </button>
 
                                 </>
-                            )} 
-                            
+                            )}
+
                         </div>
 
                         <div className="relative group">
@@ -973,7 +981,7 @@ const handleDeleteContact = async (user) => {
 
                     {/* Contact List */}
                     <div className="flex-1 overflow-y-auto px-3 space-y-1">
-                            {Array.isArray(filteredUsers) && filteredUsers.length > 0 ? (
+                        {Array.isArray(filteredUsers) && filteredUsers.length > 0 ? (
                             filteredUsers.map((user) => (
                                 <div
                                     key={user._id}
@@ -1020,11 +1028,10 @@ const handleDeleteContact = async (user) => {
 
                                     {/* Delete contact button */}
                                     <button
-                                        className={`w-8 h-8 rounded-full border-none bg-transparent flex items-center justify-center text-[13px] cursor-pointer transition-all duration-150 shrink-0 ml-2 ${
-                                            selectedUser?._id === user._id
+                                        className={`w-8 h-8 rounded-full border-none bg-transparent flex items-center justify-center text-[13px] cursor-pointer transition-all duration-150 shrink-0 ml-2 ${selectedUser?._id === user._id
                                                 ? 'opacity-100 text-white/50 hover:bg-white/15 hover:text-white'
                                                 : 'opacity-0 text-gray-300 group-hover/contact:opacity-100 hover:bg-red-500/10 hover:text-red-500 hover:scale-110'
-                                        }`}
+                                            }`}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setContactToDelete(user);
@@ -1090,7 +1097,7 @@ const handleDeleteContact = async (user) => {
             )}
 
             {/* Main Chat Interface */}
-            <main 
+            <main
                 className="flex-1 flex flex-col min-w-0 bg-white relative"
                 onTouchStart={handleMainTouchStart}
                 onTouchEnd={handleMainTouchEnd}
@@ -1140,9 +1147,9 @@ const handleDeleteContact = async (user) => {
                         </header>
 
                         {/* Dynamic Messages Area */}
-                        <div 
-                          ref={scrollRef}
-                        className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed overflow-x-hidden scrollbar-hide">
+                        <div
+                            ref={scrollRef}
+                            className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed overflow-x-hidden scrollbar-hide">
                             {loadingMessages ? (
                                 <div className="flex flex-col space-y-4">
                                     {[...Array(6)].map((_, i) => (
@@ -1259,7 +1266,7 @@ const handleDeleteContact = async (user) => {
                                             <span className="text-xs font-bold text-blue-600 mb-0.5">Replying to {replyingTo.senderName}</span>
                                             <span className="text-xs text-gray-500 truncate pr-4">{replyingTo.text}</span>
                                         </div>
-                                        <button 
+                                        <button
                                             onClick={() => setReplyingTo(null)}
                                             className="text-gray-400 hover:text-gray-600 p-2 transition-colors rounded-full hover:bg-gray-200"
                                             title="Cancel Reply"
@@ -1294,51 +1301,55 @@ const handleDeleteContact = async (user) => {
                                 ) : (
                                     /* ── Normal Input ── */
                                     <>
-                                    <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-3xl pl-3 sm:pl-4 pr-12 sm:pr-14 py-1.5 sm:py-2 relative transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 focus-within:bg-white shadow-inner">
-                                        <input
-                                            id="chat-text-input"
-                                            value={text}
-                                            onChange={(e) => setText(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && !e.shiftKey) {
-                                                    e.preventDefault();
-                                                    handleSend();
-                                                }
-                                            }}
-                                            type="text"
-                                            placeholder="Message..."
-                                            className="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 text-sm font-medium py-2.5 sm:py-3 px-2 sm:px-4 placeholder-gray-400 outline-none w-full"
-                                        />
-                                        <div className="absolute right-2 sm:right-4 flex items-center bg-transparent">
-                                            {uploading ? (
-                                                <span className="text-xs text-blue-500 animate-pulse font-medium mr-1">...</span>
-                                            ) : (
-                                                <>
-                                                <button 
-                                                    onClick={startRecording}
-                                                    className="cursor-pointer transition-colors p-1.5 flex items-center justify-center rounded-full text-gray-400 hover:text-blue-600"
-                                                >
-                                                    <FontAwesomeIcon icon={faMicrophone} className="text-xl sm:text-2xl" />
-                                                </button>
-                                                <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors p-1.5 flex items-center justify-center">
-                                                    <FontAwesomeIcon icon={faPaperclip} className="text-xl sm:text-2xl" />
-                                                    <input 
-                                                        type="file" 
-                                                        accept="*/*" 
-                                                        className="hidden" 
-                                                        onChange={handleFileUpload}
-                                                        disabled={uploading}
-                                                    />
-                                                </label>
-                                                </>
-                                            )}
+                                        <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-3xl pl-3 sm:pl-4 pr-12 sm:pr-14 py-1.5 sm:py-2 relative transition-all focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 focus-within:bg-white shadow-inner">
+                                            <input
+                                                id="chat-text-input"
+                                                value={text}
+                                                onChange={(e) => setText(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handleSend();
+                                                        setText("")
+                                                    }
+                                                }}
+                                                type="text"
+                                                placeholder="Message..."
+                                                className="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 text-sm font-medium py-2.5 sm:py-3 px-2 sm:px-4 placeholder-gray-400 outline-none w-full"
+                                            />
+                                            <div className="absolute right-2 sm:right-4 flex items-center bg-transparent">
+                                                {uploading ? (
+                                                    <span className="text-xs text-blue-500 animate-pulse font-medium mr-1">...</span>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={startRecording}
+                                                            className="cursor-pointer transition-colors p-1.5 flex items-center justify-center rounded-full text-gray-400 hover:text-blue-600"
+                                                        >
+                                                            <FontAwesomeIcon icon={faMicrophone} className="text-xl sm:text-2xl" />
+                                                        </button>
+                                                        <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors p-1.5 flex items-center justify-center">
+                                                            <FontAwesomeIcon icon={faPaperclip} className="text-xl sm:text-2xl" />
+                                                            <input
+                                                                type="file"
+                                                                accept="*/*"
+                                                                className="hidden"
+                                                                onChange={handleFileUpload}
+                                                                disabled={uploading}
+                                                            />
+                                                        </label>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <button onClick={handleSend}
-                                        className="w-11 h-11 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full sm:rounded-2xl shadow-lg sm:shadow-xl shadow-blue-200 transition-all active:scale-95 group">
-                                        <FontAwesomeIcon icon={faPaperPlane} className="group-hover:rotate-12 transition-transform text-sm sm:text-base" />
-                                    </button>
+                                        <button onClick={() => {
+                                            handleSend();
+                                            setText("");
+                                        }}
+                                            className="w-11 h-11 sm:w-14 sm:h-14 shrink-0 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full sm:rounded-2xl shadow-lg sm:shadow-xl shadow-blue-200 transition-all active:scale-95 group">
+                                            <FontAwesomeIcon icon={faPaperPlane} className="group-hover:rotate-12 transition-transform text-sm sm:text-base" />
+                                        </button>
                                     </>
                                 )}
                             </div>

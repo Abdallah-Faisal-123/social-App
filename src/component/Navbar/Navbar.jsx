@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link, NavLink, useNavigate } from "react-router";
 import { useState, useEffect, useRef, useContext } from "react";
 import { getCurrentUser } from "../../utils/getUser";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../pages/Chat/firebase";
 import { toast } from "react-toastify";
 import axios from "axios";
@@ -15,130 +15,116 @@ export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [apiUnreadCount, setApiUnreadCount] = useState(0);
-  const [savedContactIds, setSavedContactIds] = useState([]);
-  const isInitialLoad = useRef(true);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [lastUsers, setLastUsers] = useState([]);
+  const [unreadCountMap, setUnreadCountMap] = useState({});
   const navigate = useNavigate();
   const { token } = useContext(AuthContext);
-
   const unreadCount = chatUnreadCount + apiUnreadCount;
 
-  // Real-time contact discovery: directly listen to myContacts in Firebase
-  // This guarantees we find contacts even on a fresh login before going to Chat
+  // 1. Get current user and saved contacts (just exactly like chat page)
   useEffect(() => {
-     let unsub = null;
-     const fetchContacts = async () => {
-         const user = await getCurrentUser();
-         if (!user?.id) return;
-         
-         const contactsRef = collection(db, "users", String(user.id), "myContacts");
-         unsub = onSnapshot(contactsRef, (snap) => {
-             const ids = [];
-             snap.forEach(docSnap => {
-                 if (docSnap.data().userId) {
-                     ids.push(docSnap.data().userId);
-                 }
-             });
-             setSavedContactIds(ids);
-         }, (err) => console.error("Navbar myContacts listener error:", err));
-     };
-     
-     fetchContacts();
-     return () => { if (unsub) unsub(); };
+    const fetchUser = async () => {
+      const u = await getCurrentUser();
+      setCurrentUser(u);
+    };
+    fetchUser();
+    
+    const getSavedUsers = async () => {
+      try {
+        const saved = localStorage.getItem("savedUsers");
+        const user = await getCurrentUser();
+        
+        let localUsers = [];
+        if (saved) {
+            localUsers = JSON.parse(saved);
+            setLastUsers(localUsers);
+        }
+
+        // Failsafe: if completely fresh and hasn't visited Chat page yet, ensure we actively check myContacts
+        if (!saved && user?.id) {
+            const contactsRef = collection(db, "users", String(user.id), "myContacts");
+            const snap = await getDocs(contactsRef);
+            const fbContacts = [];
+            snap.forEach(doc => {
+              if (doc.data().userId) {
+                fbContacts.push({ _id: doc.data().userId });
+              }
+            });
+            if (fbContacts.length > 0) {
+              setLastUsers(fbContacts);
+            }
+        }
+      } catch (e) {
+          console.error("Error syncing users in Navbar:", e);
+      }
+    };
+    getSavedUsers();
+
+    window.addEventListener('savedUsersUpdated', getSavedUsers);
+    window.addEventListener('storage', getSavedUsers);
+    return () => {
+      window.removeEventListener('savedUsersUpdated', getSavedUsers);
+      window.removeEventListener('storage', getSavedUsers);
+    };
   }, []);
+
+  // 2. Exact same listener logic as chat page
+  useEffect(() => {
+    const uid = currentUser?.id;
+    if (!uid || !lastUsers || lastUsers.length === 0) return;
+
+    const unsubscribers = [];
+
+    lastUsers.forEach(contact => {
+        const contactId = contact._id;
+        if (!contactId) return;
+        const chatDocId = [String(uid), String(contactId)].sort().join('_');
+        const msgsRef = collection(db, 'chats', chatDocId, 'messages');
+        const q = query(msgsRef, where('read', '==', false));
+
+        const unsub = onSnapshot(q, (snap) => {
+            let count = 0;
+            snap.forEach(docSnap => {
+                const data = docSnap.data();
+                if (String(data.senderId) !== String(uid)) count++;
+            });
+            
+            setUnreadCountMap(prev => {
+                const updated = { ...prev, [String(contactId)]: count };
+                const total = Object.values(updated).reduce((a, b) => a + b, 0);
+                setChatUnreadCount(total);
+                return updated;
+            });
+        }, (err) => console.error(`Navbar unread snapshot error for ${contactId}:`, err));
+
+        unsubscribers.push(unsub);
+    });
+
+    return () => unsubscribers.forEach(u => u());
+  }, [currentUser?.id, lastUsers]);
 
   // 1. Fetch API Unread Count
   useEffect(() => {
-     if (!token) return;
-     const fetchUnread = async () => {
-         try {
-             const { data } = await axios.get('https://route-posts.routemisr.com/notifications/unread-count', {
-                 headers: { Authorization: `Bearer ${token}` }
-             });
-             const num = data?.numOfUnReadNotifications ?? data?.unreadCount ?? data?.count ?? data?.data?.count ?? data?.data?.unReadCount ?? 0;
-             setApiUnreadCount(Number(num));
-         } catch (e) {
-             console.error("Failed fetching unread count from API:", e);
-         }
-     };
-     fetchUnread();
+    if (!token) return;
+    const fetchUnread = async () => {
+      try {
+        const { data } = await axios.get('https://route-posts.routemisr.com/notifications/unread-count', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const num = data?.numOfUnReadNotifications ?? data?.unreadCount ?? data?.count ?? data?.data?.count ?? data?.data?.unReadCount ?? 0;
+        setApiUnreadCount(Number(num));
+      } catch (e) {
+        console.error("Failed fetching unread count from API:", e);
+      }
+    };
+    fetchUnread();
 
-     const handleUpdate = () => { fetchUnread(); };
-     window.addEventListener('updateNotificationCount', handleUpdate);
-     return () => window.removeEventListener('updateNotificationCount', handleUpdate);
+    const handleUpdate = () => { fetchUnread(); };
+    window.addEventListener('updateNotificationCount', handleUpdate);
+    return () => window.removeEventListener('updateNotificationCount', handleUpdate);
   }, [token]);
 
-  // 2. Firebase Chat Real-time Unread Count (per-chat listeners, no index needed)
-  useEffect(() => {
-    if (!savedContactIds.length) return;
-    let unsubscribers = [];
-
-    const initChatListeners = async () => {
-        const user = await getCurrentUser();
-        if (!user?.id) return;
-
-        const countMap = {};
-
-        savedContactIds.forEach(contactId => {
-            if (!contactId) return;
-            const chatId = [String(user.id), String(contactId)].sort().join('_');
-            const msgsRef = collection(db, 'chats', chatId, 'messages');
-            const q = query(msgsRef, where('read', '==', false));
-
-            const unsub = onSnapshot(q, (snap) => {
-                let contactCount = 0;
-                const newMsgs = [];
-
-                snap.docChanges().forEach(change => {
-                    const data = change.doc.data();
-                    if (String(data.senderId) === String(user.id)) return;
-                    if (change.type === 'added' && !isInitialLoad.current) {
-                        newMsgs.push(data);
-                    }
-                });
-
-                snap.forEach(docSnap => {
-                    const data = docSnap.data();
-                    if (String(data.senderId) !== String(user.id)) contactCount++;
-                });
-
-                countMap[String(contactId)] = contactCount;
-                const total = Object.values(countMap).reduce((a, b) => a + b, 0);
-                setChatUnreadCount(total);
-
-                // Toast + audio for new incoming messages
-                newMsgs.forEach(data => {
-                    const textPreview = data.text || (data.img ? 'Photo 📷' : data.audio ? 'Audio 🎵' : data.video ? 'Video 🎥' : data.file ? 'File 📎' : 'Attachment');
-                    toast.info(`New Message: ${textPreview.length > 30 ? textPreview.substring(0, 30) + '...' : textPreview}`, {
-                        icon: '💬',
-                        onClick: () => navigate('/chat'),
-                        autoClose: 4000
-                    });
-                    try {
-                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                        const osc = audioCtx.createOscillator();
-                        const gain = audioCtx.createGain();
-                        osc.type = 'sine';
-                        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-                        osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.15);
-                        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-                        osc.connect(gain);
-                        gain.connect(audioCtx.destination);
-                        osc.start();
-                        osc.stop(audioCtx.currentTime + 0.2);
-                    } catch(e) {}
-                });
-
-                if (isInitialLoad.current) isInitialLoad.current = false;
-            }, (err) => console.error('Navbar chat snapshot error:', err));
-
-            unsubscribers.push(unsub);
-        });
-    };
-
-    initChatListeners();
-    return () => unsubscribers.forEach(u => u());
-  }, [navigate, savedContactIds]);
 
 
   return (
@@ -171,6 +157,7 @@ export default function Navbar() {
                     {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
                   </span>
                 )}
+
               </NavLink>
             </li>
             <li>
@@ -190,9 +177,9 @@ export default function Navbar() {
             <Link to="/notifications" className="relative w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200">
               <FontAwesomeIcon icon={faBell} className="text-lg" />
               {unreadCount > 0 && (
-                  <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-sm ring-2 ring-white animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]">
-                      {unreadCount}
-                  </span>
+                <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-gradient-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-sm ring-2 ring-white animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]">
+                  {unreadCount}
+                </span>
               )}
             </Link>
 
