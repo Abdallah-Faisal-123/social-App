@@ -309,6 +309,7 @@ const [moreFrnds, setMoreFrnds] = useState(() => {
         const finalResults = updatedUsers.filter(u=>u !== null).sort((a,b)=> b.rawTime - a.rawTime)
          
         localStorage.setItem("savedUsers",JSON.stringify(finalResults))
+        window.dispatchEvent(new Event('savedUsersUpdated'));
         setLastUsers(finalResults);
         setLoading(true)  
     } catch (error) {
@@ -421,26 +422,34 @@ useEffect(() => {
     const [searchParams, setSearchParams] = useSearchParams();
     const [unreadCountMap, setUnreadCountMap] = useState({}); // map of userId -> unread count
 
-    // Real-time unread count per contact
+    // Per-chat unread count listeners — no collectionGroup index needed
     useEffect(() => {
         const uid = currentUser?.id;
-        if (!uid) return;
-        const q = query(collectionGroup(db, 'messages'), where('read', '==', false));
-        const unsub = onSnapshot(q, (snapshot) => {
-            const counts = {};
-            snapshot.forEach(docSnap => {
-                const data = docSnap.data();
-                const chatDocId = docSnap.ref.parent.parent?.id; // e.g. "uid1_uid2"
-                if (!chatDocId || !chatDocId.includes(String(uid))) return;
-                if (String(data.senderId) === String(uid)) return; // message I sent
-                const parts = chatDocId.split('_');
-                const otherId = parts[0] === String(uid) ? parts[1] : parts[0];
-                if (otherId) counts[otherId] = (counts[otherId] || 0) + 1;
-            });
-            setUnreadCountMap(counts);
-        }, (err) => console.error('unreadCountMap snapshot error:', err));
-        return () => unsub();
-    }, [currentUser?.id]); // use primitive id, not object reference
+        if (!uid || !lastUsers || lastUsers.length === 0) return;
+
+        const unsubscribers = [];
+
+        lastUsers.forEach(contact => {
+            const contactId = contact._id;
+            if (!contactId) return;
+            const chatDocId = [String(uid), String(contactId)].sort().join('_');
+            const msgsRef = collection(db, 'chats', chatDocId, 'messages');
+            const q = query(msgsRef, where('read', '==', false));
+
+            const unsub = onSnapshot(q, (snap) => {
+                let count = 0;
+                snap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (String(data.senderId) !== String(uid)) count++;
+                });
+                setUnreadCountMap(prev => ({ ...prev, [String(contactId)]: count }));
+            }, (err) => console.error(`unread snapshot error for ${contactId}:`, err));
+
+            unsubscribers.push(unsub);
+        });
+
+        return () => unsubscribers.forEach(u => u());
+    }, [currentUser?.id, lastUsers]);
 
     // Check URL parameters for direct chat link (e.g., from notifications)
     useEffect(() => {
@@ -598,10 +607,12 @@ const handleSend = async () => {
             );
             // احفظ التحديث الجديد في الـ Local Storage فوراً
             localStorage.setItem("savedUsers", JSON.stringify(updated));
+            window.dispatchEvent(new Event('savedUsersUpdated'));
             return updated;
         });
 
-        await saveContact(currentUser.id, selectedUser, chatId);
+        // Ensure we pass the current user object so myContacts can save both profiles accurately
+        await saveContact(currentUser.id, currentUser, selectedUser, chatId);
         setText("");
     } catch (error) {
         console.error(error);
@@ -645,9 +656,18 @@ const handleFileUpload = async (e) => {
         await sendMessage(selectedUser._id, "", currentUser.id, imgUrl, audioUrl, replyingTo, videoUrl, fileUrl);
         setReplyingTo(null);
         
-        setLastUsers(prev => prev.map(u => 
-            u._id === selectedUser._id ? { ...u, lastMsg: msgTypeStr } : u
-        ));
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setLastUsers(prev => {
+            const updated = prev.map(u => 
+                u._id === selectedUser._id ? { ...u, lastMsg: msgTypeStr, time: now, rawTime: Date.now() / 1000 } : u
+            );
+            localStorage.setItem("savedUsers", JSON.stringify(updated));
+            window.dispatchEvent(new Event('savedUsersUpdated'));
+            return updated;
+        });
+        
+        // Ensure we pass the current user object so myContacts can save both profiles accurately
+        await saveContact(currentUser.id, currentUser, selectedUser, chatId);
     } catch (err) {
         console.error("Cloudinary Error:", err);
     } finally {
@@ -733,9 +753,18 @@ const uploadAudioFile = async (file) => {
         await sendMessage(selectedUser._id, "", currentUser.id, null, downloadURL, replyingTo);
         setReplyingTo(null);
         
-        setLastUsers(prev => prev.map(u => 
-            u._id === selectedUser._id ? { ...u, lastMsg: "Voice message 🎤" } : u
-        ));
+        const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setLastUsers(prev => {
+            const updated = prev.map(u => 
+                u._id === selectedUser._id ? { ...u, lastMsg: "Voice message 🎤", time: now, rawTime: Date.now() / 1000 } : u
+            );
+            localStorage.setItem("savedUsers", JSON.stringify(updated));
+            window.dispatchEvent(new Event('savedUsersUpdated'));
+            return updated;
+        });
+
+        // Ensure we pass the current user object so myContacts can save both profiles accurately
+        await saveContact(currentUser.id, currentUser, selectedUser, chatId);
     } catch (err) {
         console.error("Cloudinary Audio Error:", err);
     } finally {
@@ -867,6 +896,7 @@ const handleDeleteContact = async (user) => {
         const updated = lastUsers.filter(u => u._id !== user._id);
         setLastUsers(updated);
         localStorage.setItem('savedUsers', JSON.stringify(updated));
+        window.dispatchEvent(new Event('savedUsersUpdated'));
 
         // If this was the selected user, deselect
         if (selectedUser?._id === user._id) {

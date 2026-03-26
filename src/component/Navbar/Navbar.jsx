@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link, NavLink, useNavigate } from "react-router";
 import { useState, useEffect, useRef, useContext } from "react";
 import { getCurrentUser } from "../../utils/getUser";
-import { collectionGroup, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../../pages/Chat/firebase";
 import { toast } from "react-toastify";
 import axios from "axios";
@@ -15,11 +15,36 @@ export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [apiUnreadCount, setApiUnreadCount] = useState(0);
+  const [savedContactIds, setSavedContactIds] = useState([]);
   const isInitialLoad = useRef(true);
   const navigate = useNavigate();
   const { token } = useContext(AuthContext);
 
   const unreadCount = chatUnreadCount + apiUnreadCount;
+
+  // Real-time contact discovery: directly listen to myContacts in Firebase
+  // This guarantees we find contacts even on a fresh login before going to Chat
+  useEffect(() => {
+     let unsub = null;
+     const fetchContacts = async () => {
+         const user = await getCurrentUser();
+         if (!user?.id) return;
+         
+         const contactsRef = collection(db, "users", String(user.id), "myContacts");
+         unsub = onSnapshot(contactsRef, (snap) => {
+             const ids = [];
+             snap.forEach(docSnap => {
+                 if (docSnap.data().userId) {
+                     ids.push(docSnap.data().userId);
+                 }
+             });
+             setSavedContactIds(ids);
+         }, (err) => console.error("Navbar myContacts listener error:", err));
+     };
+     
+     fetchContacts();
+     return () => { if (unsub) unsub(); };
+  }, []);
 
   // 1. Fetch API Unread Count
   useEffect(() => {
@@ -42,79 +67,79 @@ export default function Navbar() {
      return () => window.removeEventListener('updateNotificationCount', handleUpdate);
   }, [token]);
 
-  // 2. Firebase Chat Real-time Unread Count
+  // 2. Firebase Chat Real-time Unread Count (per-chat listeners, no index needed)
   useEffect(() => {
-    let unsubscribe = null;
-    const initNotifications = async () => {
+    if (!savedContactIds.length) return;
+    let unsubscribers = [];
+
+    const initChatListeners = async () => {
         const user = await getCurrentUser();
-        if (!user) return;
+        if (!user?.id) return;
 
-        const q = query(collectionGroup(db, 'messages'), where('read', '==', false));
-        unsubscribe = onSnapshot(q, (snapshot) => {
-            let count = 0;
-            snapshot.forEach(doc => {
-                const parentId = doc.ref.parent.parent?.id;
-                if (parentId && parentId.includes(String(user.id))) {
-                    const data = doc.data();
-                    if (String(data.senderId) !== String(user.id)) {
-                        count++;
-                    }
-                }
-            });
-            setChatUnreadCount(count);
+        const countMap = {};
 
-            // Handle interactive popup notifications with synthesized audio chime
-            if (!isInitialLoad.current) {
-                snapshot.docChanges().forEach((change) => {
-                    if (change.type === "added") {
-                        const data = change.doc.data();
-                        const parentId = change.doc.ref.parent.parent?.id;
-                        if (parentId && parentId.includes(String(user.id))) {
-                            if (String(data.senderId) !== String(user.id)) {
-                                const textPreview = data.text || (data.img ? "Photo 📷" : data.audio ? "Audio 🎵" : data.video ? "Video 🎥" : data.file ? "File 📎" : "Attachment");
-                                toast.info(`New Message: ${textPreview.length > 30 ? textPreview.substring(0, 30) + '...' : textPreview}`, {
-                                    icon: "💬",
-                                    onClick: () => navigate('/chat'),
-                                    autoClose: 4000
-                                });
+        savedContactIds.forEach(contactId => {
+            if (!contactId) return;
+            const chatId = [String(user.id), String(contactId)].sort().join('_');
+            const msgsRef = collection(db, 'chats', chatId, 'messages');
+            const q = query(msgsRef, where('read', '==', false));
 
-                                // Play a highly optimized native Web Audio bell tone
-                                try {
-                                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                                    const oscillator = audioCtx.createOscillator();
-                                    const gainNode = audioCtx.createGain();
-                                    oscillator.type = 'sine';
-                                    oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
-                                    oscillator.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.15);
-                                    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                                    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
-                                    oscillator.connect(gainNode);
-                                    gainNode.connect(audioCtx.destination);
-                                    oscillator.start();
-                                    oscillator.stop(audioCtx.currentTime + 0.2);
-                                } catch(e) { console.error("Audio block fallback:", e); }
-                            }
-                        }
+            const unsub = onSnapshot(q, (snap) => {
+                let contactCount = 0;
+                const newMsgs = [];
+
+                snap.docChanges().forEach(change => {
+                    const data = change.doc.data();
+                    if (String(data.senderId) === String(user.id)) return;
+                    if (change.type === 'added' && !isInitialLoad.current) {
+                        newMsgs.push(data);
                     }
                 });
-            } else {
-                if (count > 0) {
-                    toast.info(`You have ${count} unread chat message${count > 1 ? 's' : ''} waiting!`, {
-                        icon: "🔔",
-                        onClick: () => navigate('/notifications'),
-                        autoClose: 5000
+
+                snap.forEach(docSnap => {
+                    const data = docSnap.data();
+                    if (String(data.senderId) !== String(user.id)) contactCount++;
+                });
+
+                countMap[String(contactId)] = contactCount;
+                const total = Object.values(countMap).reduce((a, b) => a + b, 0);
+                setChatUnreadCount(total);
+
+                // Toast + audio for new incoming messages
+                newMsgs.forEach(data => {
+                    const textPreview = data.text || (data.img ? 'Photo 📷' : data.audio ? 'Audio 🎵' : data.video ? 'Video 🎥' : data.file ? 'File 📎' : 'Attachment');
+                    toast.info(`New Message: ${textPreview.length > 30 ? textPreview.substring(0, 30) + '...' : textPreview}`, {
+                        icon: '💬',
+                        onClick: () => navigate('/chat'),
+                        autoClose: 4000
                     });
-                }
-                isInitialLoad.current = false;
-            }
+                    try {
+                        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                        osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.15);
+                        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.2);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start();
+                        osc.stop(audioCtx.currentTime + 0.2);
+                    } catch(e) {}
+                });
+
+                if (isInitialLoad.current) isInitialLoad.current = false;
+            }, (err) => console.error('Navbar chat snapshot error:', err));
+
+            unsubscribers.push(unsub);
         });
     };
-    initNotifications();
 
-    return () => {
-        if (unsubscribe) unsubscribe();
-    };
-  }, [navigate]);
+    initChatListeners();
+    return () => unsubscribers.forEach(u => u());
+  }, [navigate, savedContactIds]);
+
 
   return (
     <>
