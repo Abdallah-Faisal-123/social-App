@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react'
-import { useParams } from 'react-router'
+import { useParams, useNavigate } from 'react-router'
 import Navbar from '../../component/Navbar/Navbar'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faUser } from '@fortawesome/free-solid-svg-icons'
@@ -11,6 +11,7 @@ import FollowButton from '../../component/FollowButton/FollowButton'
 
 export default function UserProfile() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { token, setToken } = useContext(AuthContext)
   
   const [userPosts, setUserPosts] = useState(null)
@@ -116,8 +117,14 @@ export default function UserProfile() {
             </div>
 
             {/* Action Button: Follow */}
-            <div className="w-full sm:w-auto mt-4 sm:mt-0">
-               <FollowButton targetUserId={id} className="w-full sm:w-auto px-10 py-3 text-sm md:text-base" />
+            <div className="w-full sm:w-auto mt-4 sm:mt-0 flex gap-2">
+               <FollowButton targetUserId={id} className="flex-1 sm:w-auto px-10 py-3 text-sm md:text-base" />
+               <button
+                 onClick={() => navigate(`/chat?user=${id}`)}
+                 className="flex-1 sm:w-auto px-6 py-3 text-sm md:text-base bg-white border-2 border-indigo-500 text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-sm"
+               >
+                 Message
+               </button>
             </div>
           </div>
         </div>

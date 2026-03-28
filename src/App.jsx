@@ -14,6 +14,7 @@ import ProtectedRoute from "./component/ProtectedRoute/ProtectedRoute";
 import AuthProtector from "./component/AuthProtector/AuthProtector";
 import Chat from "./pages/Chat/chat";
 import Notifications from "./pages/Notifications/Notifications";
+import Search from "./pages/Search/Search";
 
 
 function App() {
@@ -29,6 +30,7 @@ function App() {
         { path: "user/:id", element: <ProtectedRoute><UserProfile /></ProtectedRoute> },
         { path: "postdetails/:id", element: <ProtectedRoute><Postdetails /></ProtectedRoute> },
         { path: "chat", element: <ProtectedRoute><Chat /></ProtectedRoute> },
+        { path: "search", element: <ProtectedRoute><Search /></ProtectedRoute> },
         { path: "settings", element: <ProtectedRoute><Settings/></ProtectedRoute> },
         { path: "notifications", element: <ProtectedRoute><Notifications/></ProtectedRoute> },
         { path: "*", element: <Notfound /> },

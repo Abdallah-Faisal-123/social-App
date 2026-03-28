@@ -158,6 +158,11 @@ export default function Navbar() {
               </NavLink>
             </li>
             <li>
+              <NavLink to="/search" className={({ isActive }) => `px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'}`}>
+                Search
+              </NavLink>
+            </li>
+            <li>
               <NavLink to="/settings" className={({ isActive }) => `px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-50'}`}>
                 Settings
               </NavLink>
@@ -222,6 +227,15 @@ export default function Navbar() {
                 className={({ isActive }) => `${isActive ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-slate-600 hover:bg-slate-50'} font-semibold transition-all duration-200 block px-4 py-3 rounded-xl`}
               >
                 Profile
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/search"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={({ isActive }) => `${isActive ? 'text-indigo-600 bg-indigo-50 font-bold' : 'text-slate-600 hover:bg-slate-50'} font-semibold transition-all duration-200 block px-4 py-3 rounded-xl`}
+              >
+                Search
               </NavLink>
             </li>
             <li>

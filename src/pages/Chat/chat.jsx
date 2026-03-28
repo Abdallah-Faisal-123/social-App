@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router';
+import { useSearchParams, Link } from 'react-router';
 import { getCurrentUser } from "../../utils/getUser";
 import { useChatMessages } from "../../utils/useChatMessages";
 import { sendMessage } from "../../utils/sendMessage";
@@ -123,7 +123,6 @@ export default function Chat() {
     const [lastUsers, setLastUsers] = useState([]);
     const { token } = useContext(AuthContext);
     const [currentUser, setCurrentUser] = useState(null);
-    const [newContact, setNewContact] = useState(false)
     const [loading, setLoading] = useState(true);
     const scrollRef = useRef(null);
     const [uploading, setUploading] = useState(false);
@@ -140,6 +139,7 @@ export default function Chat() {
     const deleteMenuRef = useRef(null);
     const longPressTimerRef = useRef(null);
     const mainSwipeStartX = useRef(null);
+    const [isTargetUserLoading, setIsTargetUserLoading] = useState(false);
     const [hiddenMsgIds, setHiddenMsgIds] = useState(() => {
         try { return JSON.parse(localStorage.getItem('hiddenMsgIds') || '[]'); } catch { return []; }
     });
@@ -332,61 +332,7 @@ export default function Chat() {
         }
     }, [token, currentUser]);
 
-    async function getAllUsers() {
-        if (!token || !currentUser) return;
-        setLoading(true)
 
-        setLastUsers([]);
-
-        try {
-            let allUsersAccumulator = [];
-            const totalPagesToFetch = moreFrnds;
-
-            const requests = [];
-            for (let i = 1; i <= totalPagesToFetch; i++) {
-
-                requests.push(
-                    axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=50&page=${i}`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    })
-                );
-
-
-            }
-
-
-            const responses = await Promise.all(requests);
-
-
-            responses.forEach(response => {
-                const pageUsers = response.data.data.suggestions;
-                if (pageUsers) {
-                    allUsersAccumulator = [...allUsersAccumulator, ...pageUsers];
-                }
-            });
-
-
-            const uniqueUsersMap = new Map();
-            allUsersAccumulator.forEach(user => {
-                if (user && user._id !== currentUser.id && !uniqueUsersMap.has(user._id)) {
-                    uniqueUsersMap.set(user._id, {
-                        ...user,
-                        lastMsg: 'Tap to start chatting',
-                        time: ''
-                    });
-                }
-            });
-
-            const finalResults = Array.from(uniqueUsersMap.values());
-            setLastUsers(finalResults);
-
-        } catch (error) {
-            console.error("Error fetching massive users list:", error);
-
-        } finally {
-            setLoading(false)
-        }
-    }
     useEffect(() => {
         const fetchUserProfile = async () => {
             if (!token) return;
@@ -467,6 +413,7 @@ export default function Chat() {
         if (selectedUser && String(selectedUser._id) === targetUserId) return;
 
         const connectTargetUser = async () => {
+            setIsTargetUserLoading(true);
             const foundLocal = lastUsers.find(u => String(u._id) === targetUserId);
             if (foundLocal) {
                 setSelectedUser(foundLocal);
@@ -474,6 +421,7 @@ export default function Chat() {
                 // remove user param so a refresh doesn't lock them here
                 searchParams.delete("user");
                 setSearchParams(searchParams, { replace: true });
+                setIsTargetUserLoading(false);
             } else {
                 // Not in our known list, ping API directly so they can be selected!
                 try {
@@ -490,6 +438,8 @@ export default function Chat() {
                     }
                 } catch (err) {
                     console.error("Failed fetching external user for chat:", err);
+                } finally {
+                    setIsTargetUserLoading(false);
                 }
             }
         };
@@ -917,39 +867,6 @@ export default function Chat() {
                     <div className="p-6">
                         <div className="flex items-center justify-between mb-8">
                             <h1 className="text-3xl font-extrabold tracking-tight text-gray-900">Messages</h1>
-                            {newContact ? (
-                                <>
-                                    <button onClick={() => {
-                                        setLastUsers([]);
-                                        getlatestusers();
-                                        getSavedUsers()
-                                        setNewContact(false);
-                                    }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
-                                        <FontAwesomeIcon icon={faArrowAltCircleLeft} />
-                                    </button>
-
-                                    <button onClick={() => {
-                                        const nextBatch = moreFrnds + 1;
-                                        setMoreFrnds(nextBatch);
-                                        localStorage.setItem("lastPaginationPage", nextBatch.toString());
-                                        getAllUsers();
-                                    }} className="w-11 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
-                                        more
-                                    </button>
-                                </>
-                            ) : (
-                                <>
-                                    <button onClick={() => {
-                                        getAllUsers();
-                                        setNewContact(true);
-                                        setLoading(true)
-                                    }} className="w-10 h-10 flex items-center justify-center bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform">
-                                        <FontAwesomeIcon icon={faPlus} />
-                                    </button>
-
-                                </>
-                            )}
-
                         </div>
 
                         <div className="relative group">
@@ -983,14 +900,19 @@ export default function Chat() {
                                         : 'hover:bg-white hover:shadow-md'
                                         }`}
                                 >
-                                    <div className="relative shrink-0">
+                                    <Link 
+                                        to={`/user/${user?._id}`} 
+                                        onClick={(e) => e.stopPropagation()} 
+                                        className="relative shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                                        title={`Visit ${user?.name}'s Profile`}
+                                    >
                                         <div className={`p-0.5 rounded-full ${selectedUser?._id === user._id ? 'bg-white/20' : 'bg-transparent'}`}>
                                             <img src={user?.photo || user?.avatar} alt={user?.name} className="w-14 h-14 rounded-full bg-white object-cover shadow-inner" />
                                         </div>
                                         {user?.online && (
                                             <div className="absolute bottom-0.5 right-0.5 w-4 h-4 bg-green-500 border-2 border-white rounded-full shadow-sm"></div>
                                         )}
-                                    </div>
+                                    </Link>
 
                                     <div className="ml-4 flex-1 overflow-hidden">
                                         <div className="flex justify-between items-baseline mb-1">
@@ -1090,16 +1012,23 @@ export default function Chat() {
                 onTouchEnd={handleMainTouchEnd}
             >
                 {!selectedUser ? (
-                    <div className="flex-1 flex flex-col items-center justify-center bg-gray-50/30 p-8 text-center animate-fade-in-up">
-                        <div className="w-24 h-24 bg-blue-600/10 rounded-full flex items-center justify-center text-blue-600 text-4xl mb-6 shadow-inner">
-                            <FontAwesomeIcon icon={faPaperPlane} className="-rotate-12" />
+                    isTargetUserLoading ? (
+                        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50/30 p-8 text-center animate-fade-in-up">
+                            <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                            <h2 className="text-xl font-bold text-gray-700">Connecting to chat...</h2>
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Messages</h2>
-                        <p className="text-gray-500 max-w-sm">
-                            Connect with your friends by selecting a conversation from the sidebar.
-                            Start sharing moments and staying in touch!
-                        </p>
-                    </div>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50/30 p-8 text-center animate-fade-in-up">
+                            <div className="w-24 h-24 bg-blue-600/10 rounded-full flex items-center justify-center text-blue-600 text-4xl mb-6 shadow-inner">
+                                <FontAwesomeIcon icon={faPaperPlane} className="-rotate-12" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome to Messages</h2>
+                            <p className="text-gray-500 max-w-sm">
+                                Connect with your friends by selecting a conversation from the sidebar.
+                                Start sharing moments and staying in touch!
+                            </p>
+                        </div>
+                    )
                 ) : (
                     <>
                         {/* Modern Header */}
@@ -1112,7 +1041,7 @@ export default function Chat() {
                                     <FontAwesomeIcon icon={faChevronLeft} className="text-lg" />
                                 </button>
 
-                                <div className="relative shrink-0 cursor-pointer group">
+                                <Link to={`/user/${selectedUser?._id}`} className="relative shrink-0 cursor-pointer group hover:opacity-80 transition-opacity">
                                     <img
                                         src={selectedUser?.photo || selectedUser?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=Default"}
                                         className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover ring-2 ring-transparent group-hover:ring-blue-100 transition-all"
@@ -1121,11 +1050,13 @@ export default function Chat() {
                                     {selectedUserOnline && (
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
                                     )}
-                                </div>
+                                </Link>
 
                                 <div className="ml-4 truncate">
-                                    <h2 className="text-lg font-extrabold text-gray-900 truncate tracking-tight">{selectedUser?.name}</h2>
-                                    <div className="flex items-center space-x-1.5">
+                                    <Link to={`/user/${selectedUser?._id}`} className="hover:underline cursor-pointer decoration-blue-500">
+                                        <h2 className="text-lg font-extrabold text-gray-900 truncate tracking-tight">{selectedUser?.name}</h2>
+                                    </Link>
+                                    <div className="flex items-center space-x-1.5 mt-0.5">
                                         <span className={`w-2 h-2 rounded-full ${selectedUserOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></span>
                                         <p className="text-xs font-semibold text-gray-400">{selectedUserOnline ? 'Online now' : 'Offline'}</p>
                                     </div>
