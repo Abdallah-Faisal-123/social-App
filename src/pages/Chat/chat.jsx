@@ -414,10 +414,12 @@ export default function Chat() {
 
         const connectTargetUser = async () => {
             setIsTargetUserLoading(true);
+            // Close mobile sidebar immediately so the user sees the loader on mobile
+            setMobileSidebarOpen(false);
+            
             const foundLocal = lastUsers.find(u => String(u._id) === targetUserId);
             if (foundLocal) {
                 setSelectedUser(foundLocal);
-                setMobileSidebarOpen(false);
                 // remove user param so a refresh doesn't lock them here
                 searchParams.delete("user");
                 setSearchParams(searchParams, { replace: true });
@@ -432,7 +434,6 @@ export default function Chat() {
                     if (u && u._id) {
                         const newContactObj = { ...u, online: false, lastMsg: 'Start chatting...', time: '' };
                         setSelectedUser(newContactObj);
-                        setMobileSidebarOpen(false);
                         searchParams.delete("user");
                         setSearchParams(searchParams, { replace: true });
                     }
