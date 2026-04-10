@@ -5,7 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Link, NavLink, useNavigate } from "react-router";
 import { useState, useEffect, useRef, useContext } from "react";
 import { getCurrentUser } from "../../utils/getUser";
-import { collection, onSnapshot, query, where, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query, where, getDocs, collectionGroup } from "firebase/firestore";
 import { db } from "../../pages/Chat/firebase";
 import { toast } from "react-toastify";
 import axios from "axios";
@@ -20,81 +20,42 @@ export default function Navbar() {
   const [unreadCountMap, setUnreadCountMap] = useState({});
   const navigate = useNavigate();
   const { token } = useContext(AuthContext);
-  const unreadCount = chatUnreadCount + apiUnreadCount;
 
-  // 1. Get current user and saved contacts (just like chat page)
+  // 1. Ultimate Realtime Chat Unread Counter (Uses Firestore Composite Index)
+  // Completely detached from myContacts! Triggers instantly even from absolute strangers perfectly catching new messages anywhere.
   useEffect(() => {
-    const user = getCurrentUser();
-    setCurrentUser(user);
+    let unsub = null;
+    const initCounter = async () => {
+      const user = await getCurrentUser();
+      setCurrentUser(user);
+      if (!user?.id) return;
 
-    const getSavedUsers = async () => {
-      try {
-        const saved = localStorage.getItem("savedUsers");
+      const msgsRef = collectionGroup(db, 'messages');
+      const q = query(msgsRef, where('read', '==', false));
 
-        if (saved) {
-          setLastUsers(JSON.parse(saved));
-        } else if (user?.id) {
-          // Failsafe: if fresh start and hasn't visited Chat page yet, read myContacts from Firebase
-          const contactsRef = collection(db, "users", String(user.id), "myContacts");
-          const snap = await getDocs(contactsRef);
-          const fbContacts = [];
-          snap.forEach(doc => {
-            if (doc.data().userId) {
-              fbContacts.push({ _id: doc.data().userId });
-            }
-          });
-          if (fbContacts.length > 0) {
-            setLastUsers(fbContacts);
+      unsub = onSnapshot(q, (snap) => {
+        let unreadCountInternal = 0;
+        snap.forEach(docSnap => {
+          // Verify if this global unread message actually belongs to one of our conversations
+          const docPath = docSnap.ref.path;
+          const pathParts = docPath.split('/');
+          if (pathParts.length >= 2) {
+              const chatId = pathParts[1];
+              if (chatId.includes(String(user.id))) {
+                  const data = docSnap.data();
+                  if (String(data.senderId) !== String(user.id)) {
+                      unreadCountInternal++;
+                  }
+              }
           }
-        }
-      } catch (e) {
-        console.error("Error syncing users in Navbar:", e);
-      }
+        });
+        setChatUnreadCount(unreadCountInternal);
+      }, (err) => console.error("Realtime Unread Counter Error:", err));
     };
-    getSavedUsers();
 
-    window.addEventListener('savedUsersUpdated', getSavedUsers);
-    window.addEventListener('storage', getSavedUsers);
-    return () => {
-      window.removeEventListener('savedUsersUpdated', getSavedUsers);
-      window.removeEventListener('storage', getSavedUsers);
-    };
+    initCounter();
+    return () => { if (unsub) unsub(); };
   }, []);
-
-  // 2. Exact same listener logic as chat page
-  useEffect(() => {
-    const uid = currentUser?.id;
-    if (!uid || !lastUsers || lastUsers.length === 0) return;
-
-    const unsubscribers = [];
-
-    lastUsers.forEach(contact => {
-        const contactId = contact._id;
-        if (!contactId) return;
-        const chatDocId = [String(uid), String(contactId)].sort().join('_');
-        const msgsRef = collection(db, 'chats', chatDocId, 'messages');
-        const q = query(msgsRef, where('read', '==', false));
-
-        const unsub = onSnapshot(q, (snap) => {
-            let count = 0;
-            snap.forEach(docSnap => {
-                const data = docSnap.data();
-                if (String(data.senderId) !== String(uid)) count++;
-            });
-            
-            setUnreadCountMap(prev => {
-                const updated = { ...prev, [String(contactId)]: count };
-                const total = Object.values(updated).reduce((a, b) => a + b, 0);
-                setChatUnreadCount(total);
-                return updated;
-            });
-        }, (err) => console.error(`Navbar unread snapshot error for ${contactId}:`, err));
-
-        unsubscribers.push(unsub);
-    });
-
-    return () => unsubscribers.forEach(u => u());
-  }, [currentUser?.id, lastUsers]);
 
   // 1. Fetch API Unread Count
   useEffect(() => {
@@ -173,9 +134,9 @@ export default function Navbar() {
             {/* Notification Bell */}
             <Link to="/notifications" className="relative w-10 h-10 flex items-center justify-center rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all duration-200">
               <FontAwesomeIcon icon={faBell} className="text-lg" />
-              {unreadCount > 0 && (
+              {apiUnreadCount > 0 && (
                 <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-linear-to-r from-rose-500 to-pink-500 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-sm ring-2 ring-white animate-pulse">
-                  {unreadCount}
+                  {apiUnreadCount > 99 ? '99+' : apiUnreadCount}
                 </span>
               )}
             </Link>

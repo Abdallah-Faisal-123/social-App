@@ -6,7 +6,7 @@ export const saveContact = async (currentUserId, currentUserData, otherUser, cha
     username: otherUser.name,
     photo: otherUser.photo || "",
     chatId: chatId,
-    lastInteraction: serverTimestamp() 
+    lastInteraction: serverTimestamp()
   }, { merge: true });
 
   const otherContactRef = doc(db, "users", otherUser._id, "myContacts", currentUserId);

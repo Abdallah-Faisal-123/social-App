@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBell, faCommentDots, faUserPlus, faHeart, faComment } from '@fortawesome/free-solid-svg-icons';
 import { AuthContext } from '../../component/Authcontext/Authcontext';
 import { getCurrentUser } from '../../utils/getUser';
-import { doc, updateDoc, writeBatch, collectionGroup, onSnapshot, where } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, collectionGroup, onSnapshot, where, query } from 'firebase/firestore';
 import { db } from '../Chat/firebase';
 import { Link } from 'react-router';
 import axios from 'axios';

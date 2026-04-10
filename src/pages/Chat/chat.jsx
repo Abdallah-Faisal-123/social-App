@@ -145,192 +145,131 @@ export default function Chat() {
     });
     // Contact delete state
     const [contactToDelete, setContactToDelete] = useState(null);
-    // تعديل تعريف الـ State في بداية الكومبوننت
-    const [moreFrnds, setMoreFrnds] = useState(() => {
-        const savedPage = localStorage.getItem("lastPaginationPage");
-        return savedPage ? parseInt(savedPage) : 25; // لو مفيش، ابدأ بـ 25
-    });
-    // Removed the fixed timeout loading so new users don't wait unnecessarily
-    async function getlatestusers() {
-        if (!token || !currentUser) return;
 
-        try {
+    useEffect(() => {
+        if (!token || !currentUser?.id) {
+            setLoading(false);
+            return;
+        }
 
-            const requests = [];
-            for (let i = 1; i <= moreFrnds; i++) {
-                requests.push(
-                    axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=50&page=${i}`, {
-                        headers: { Authorization: `Bearer ${token}` }
-                    })
-                );
-            }
-
-            const responses = await Promise.all(requests);
-            let allPossibleContacts = [];
-
-            responses.forEach(res => {
-                if (res.data.data.suggestions) {
-                    allPossibleContacts = [...allPossibleContacts, ...res.data.data.suggestions];
-                }
-            });
-
-            // Also fetch saved contacts directly from Firebase so they are never lost
+        const myContactsRef = collection(db, "users", String(currentUser.id), "myContacts");
+        const unsubContacts = onSnapshot(myContactsRef, async (contactsSnap) => {
             try {
-                const myContactsRef = collection(db, "users", String(currentUser.id), "myContacts");
-                const contactsSnap = await getDocs(myContactsRef);
+                let finalContacts = [];
+
                 contactsSnap.forEach(docSnap => {
                     const data = docSnap.data();
-                    allPossibleContacts.push({
-                        _id: data.userId,
-                        name: data.username,
-                        photo: data.photo,
-                        chatId: data.chatId
-                    });
-                });
-            } catch (err) {
-                console.error("Error fetching myContacts:", err);
-            }
-
-            const uniqueMap = new Map();
-            allPossibleContacts.forEach(u => {
-                if (u && u._id !== currentUser.id) uniqueMap.set(u._id, u);
-            });
-
-            // Absolute Safety Net: Aggressively scan ALL messages directly from Firebase
-            // This finds 'phantom' old chats where the contact doesn't exist in the API paginations at all!
-            try {
-                const allMsgsSnap = await getDocs(collectionGroup(db, 'messages'));
-                const shadowPromises = [];
-
-                allMsgsSnap.forEach(docSnap => {
-                    const parentPath = docSnap.ref.parent.parent?.id; // 'user1_user2'
-                    if (parentPath && parentPath.includes(String(currentUser.id))) {
-                        const parts = parentPath.split('_');
-                        if (parts.length === 2) {
-                            const otherId = parts[0] === String(currentUser.id) ? parts[1] : parts[0];
-                            if (otherId && !uniqueMap.has(otherId)) {
-                                const msgData = docSnap.data();
-                                // If they are missing, attempt to extract their real API profile by checking their posts!
-                                let suspectedName = msgData.replyTo?.senderName || "Contact";
-                                let suspectedPhoto = "https://api.dicebear.com/7.x/avataaars/svg?seed=" + otherId;
-
-                                // Immediately mark to prevent processing duplicate messages for this same hidden user
-                                uniqueMap.set(otherId, { _id: otherId });
-
-                                shadowPromises.push((async () => {
-                                    try {
-                                        const pfCheck = await axios.get(`https://route-posts.routemisr.com/users/${otherId}/posts`, {
-                                            headers: { Authorization: `Bearer ${token}` }
-                                        });
-                                        if (pfCheck.data?.data?.posts?.length > 0) {
-                                            const extUser = pfCheck.data.data.posts[0].user;
-                                            if (extUser) {
-                                                suspectedName = extUser.name || suspectedName;
-                                                suspectedPhoto = extUser.photo || suspectedPhoto;
-                                            }
-                                        } else {
-                                            throw new Error("Force deep search");
-                                        }
-                                    } catch (e) {
-                                        // Silent failure on posts. Aggressively search up to 50 depth pages of the suggestions API!
-                                        for (let searchPage = 1; searchPage <= 50; searchPage++) {
-                                            try {
-                                                const pgRes = await axios.get(`https://route-posts.routemisr.com/users/suggestions?limit=100&page=${searchPage}`, {
-                                                    headers: { Authorization: `Bearer ${token}` }
-                                                });
-                                                const candidates = pgRes.data?.data?.suggestions || [];
-                                                const match = candidates.find(c => c._id === otherId);
-                                                if (match) {
-                                                    suspectedName = match.name;
-                                                    suspectedPhoto = match.photo;
-                                                    break;
-                                                }
-                                                if (candidates.length === 0) break; // Exhausted API
-                                            } catch (pgErr) { break; }
-                                        }
-                                    }
-
-                                    uniqueMap.set(otherId, {
-                                        _id: otherId,
-                                        name: suspectedName,
-                                        photo: suspectedPhoto,
-                                        chatId: parentPath
-                                    });
-                                })());
-                            }
-                        }
+                    if (data.userId && data.userId !== currentUser.id) {
+                        finalContacts.push({
+                            _id: data.userId,
+                            name: data.username || "User",
+                            photo: data.photo || "https://api.dicebear.com/7.x/avataaars/svg?seed=" + data.userId,
+                            chatId: data.chatId
+                        });
                     }
                 });
 
-                if (shadowPromises.length > 0) {
-                    await Promise.all(shadowPromises);
-                }
-            } catch (err) {
-                console.error("Error spanning collectionGroup for shadow contacts:", err);
-            }
+                const updatedUsers = await Promise.all(finalContacts.map(async (user) => {
+                    const chatId = [currentUser.id, user._id].sort().join("_");
+                    const msgsRef = collection(db, "chats", chatId, "messages");
+                    const q = query(msgsRef, orderBy("createdAt", "desc"), limit(1));
 
-            const usersArray = Array.from(uniqueMap.values());
-
-            const updatedUsers = await Promise.all(usersArray.map(async (user) => {
-                const chatId = [currentUser.id, user._id].sort().join("_");
-                const msgsRef = collection(db, "chats", chatId, "messages");
-                const q = query(msgsRef, orderBy("createdAt", "desc"), limit(1));
-
-                const querySnapshot = await getDocs(q);
-
-                if (!querySnapshot.empty) {
+                    const querySnapshot = await getDocs(q);
                     const statusRef = doc(db, "userStatus", user._id);
                     const statusSnap = await getDoc(statusRef);
                     const online = statusSnap.exists() ? statusSnap.data().online : false;
-                    const lastDoc = querySnapshot.docs[0].data();
 
-                    let msgContent = lastDoc.text;
-                    if (!msgContent) {
-                        if (lastDoc.img) msgContent = "Photo 📷";
-                        else if (lastDoc.audio) msgContent = "Audio 🎵";
-                        else if (lastDoc.video) msgContent = "Video 🎥";
-                        else if (lastDoc.file) msgContent = "File 📎";
+                    if (!querySnapshot.empty) {
+                        const lastDoc = querySnapshot.docs[0].data();
+
+                        let msgContent = lastDoc.text;
+                        if (!msgContent) {
+                            if (lastDoc.img) msgContent = "Photo 📷";
+                            else if (lastDoc.audio) msgContent = "Audio 🎵";
+                            else if (lastDoc.video) msgContent = "Video 🎥";
+                            else if (lastDoc.file) msgContent = "File 📎";
+                        }
+
+                        return {
+                            ...user,
+                            online,
+                            lastMsg: msgContent || "",
+                            rawTime: lastDoc.createdAt?.seconds || 0,
+                            time: lastDoc.createdAt?.seconds
+                                ? new Date(lastDoc.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                : ""
+                        };
                     }
-
+                    
                     return {
                         ...user,
                         online,
-                        lastMsg: msgContent || "",
-                        rawTime: lastDoc.createdAt?.seconds || 0,
-                        time: lastDoc.createdAt?.seconds
-                            ? new Date(lastDoc.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                            : ""
+                        lastMsg: "Tap to chat",
+                        rawTime: 0,
+                        time: ""
                     };
+                }));
+
+                const finalResults = updatedUsers.sort((a, b) => b.rawTime - a.rawTime);
+                setLastUsers(finalResults);
+            } catch (error) {
+                console.error("Error processing real-time contacts:", error);
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // SHADOW SCANNER: Listen to all messages in the database globally to bypass Firestore write-permission blocks
+        // This instantly catches any message sent to you by a stranger, grabs their profile, and securely injects them into YOUR myContacts
+        const allMsgsRef = collectionGroup(db, 'messages');
+        const unsubMessages = onSnapshot(allMsgsRef, async (snap) => {
+            snap.docChanges().forEach(change => {
+                if (change.type === 'added') {
+                    const docPath = change.doc.ref.path;
+                    const pathParts = docPath.split('/');
+                    if (pathParts.length >= 2) {
+                        const chatId = pathParts[1];
+                        if (chatId.includes(String(currentUser.id))) {
+                            const parts = chatId.split('_');
+                            const otherId = parts[0] === String(currentUser.id) ? parts[1] : parts[0];
+                            if (!otherId) return;
+                            
+                            setLastUsers(prevUsers => {
+                                const exists = prevUsers.find(u => String(u._id) === String(otherId));
+                                if (!exists) {
+                                    (async () => {
+                                        try {
+                                            const res = await axios.get(`https://route-posts.routemisr.com/users/${otherId}/profile`, {
+                                                headers: { Authorization: `Bearer ${token}` }
+                                            });
+                                            const u = res.data?.user || res.data?.data?.user;
+                                            if (u && u._id) {
+                                                const newRef = doc(db, "users", String(currentUser.id), "myContacts", String(u._id));
+                                                await setDoc(newRef, {
+                                                    userId: u._id,
+                                                    username: u.name,
+                                                    photo: u.photo || "",
+                                                    chatId: [String(currentUser.id), String(u._id)].sort().join('_')
+                                                }, { merge: true });
+                                            }
+                                        } catch (e) {
+                                            console.error("Could not rescue shadow contact:", e);
+                                        }
+                                    })();
+                                }
+                                return prevUsers;
+                            });
+                        }
+                    }
                 }
-                return null;
-            }));
+            });
+        });
 
-            const finalResults = updatedUsers.filter(u => u !== null).sort((a, b) => b.rawTime - a.rawTime)
-
-            localStorage.setItem("savedUsers", JSON.stringify(finalResults))
-            window.dispatchEvent(new Event('savedUsersUpdated'));
-            setLastUsers(finalResults);
-            setLoading(false)
-        } catch (error) {
-            console.error("Error fetching latest users:", error);
-        }
-    }
-    function getSavedUsers() {
-        const saved = localStorage.getItem("savedUsers")
-        if (saved) {
-            setLastUsers(JSON.parse(saved));
-        } else {
-            setLastUsers([]);
-        }
-        // Turn off loading immediately once local state initializes (especially for new users)
-        setLoading(false);
-    }
-    useEffect(() => {
-        if (currentUser && token) {
-            getSavedUsers()
-            getlatestusers();
-        }
-    }, [token, currentUser]);
+        return () => {
+            unsubContacts();
+            unsubMessages();
+        };
+    }, [currentUser?.id, token]);
 
 
     useEffect(() => {
